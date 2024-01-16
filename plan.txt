@@ -1,0 +1,16 @@
+https://mimicgen.github.io/
+
+trian a policy with mimic gen
+get it learning a task, remember this policy
+
+Try policy on new task
+add noise to the policy
+  dont use random noise - not repeatable
+  eg add fixed velocity a every time step
+  
+see how much noise is required before it can do it
+
+repeat for new objects
+
+maybe limit to 4 degrees of freedom
+(3 degrees
