@@ -2,6 +2,8 @@ import pybullet as p
 import time
 import pybullet_data
 import pickle
+import os
+import keyboard
 from controller import XboxController
  
 p.connect(p.GUI)
@@ -55,7 +57,7 @@ def main():
 
     trace = [get_joint_positions()]    #The trace so far. trace[-1] is the last keyframe added
 
-    while not controller.Start: #use start button to exit and save trace so far
+    while not controller.Start and not keyboard.is_pressed("q"): #use start button to exit and save trace so far
 
         if controller.LeftBumper: #move to previous joint
             current_joint = Clamp(current_joint - 1, 0, numJoints - 1)
@@ -73,9 +75,10 @@ def main():
         if controller.X: #save this joint to intermediate_pose
             intermediate_pose = get_joint_positions()
 
-        if controller.A: #save this position as a key frame
+        if controller.A or keyboard.is_pressed("space"): #save this position as a key frame
             trace.append(get_joint_positions())
             intermediate_pose = get_joint_positions()
+            print("!!!!!!!!!!!!!!!!!!")
 
         joints = get_joint_positions()
         joints[current_joint] += controller.LeftJoystickY
@@ -90,7 +93,9 @@ def main():
 
     p.disconnect()
 
-    with open('trace.pkl', 'wb') as f:
+    
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "trace.pkl")
+    with open(path, 'wb') as f:
         pickle.dump(trace, f)
 
     print("")

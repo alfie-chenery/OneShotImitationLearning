@@ -2,10 +2,11 @@ import pybullet as p
 import time
 import pybullet_data
 import pickle
+import os
 
 p.connect(p.GUI)
 p.resetSimulation()
-p.setAdditionalSearchPath(pybullet_data.getDataPath()) #optionally
+p.setAdditionalSearchPath(pybullet_data.getDataPath())
 p.setGravity(0,0,-10)
 
 planeId = p.loadURDF("plane.urdf")
@@ -13,7 +14,8 @@ armId = p.loadURDF("franka_panda/panda.urdf", [0,0,0], [0,0,0,1], useFixedBase=T
 numJoints = p.getNumJoints(armId)
 end_effector_id = numJoints - 1
 
-with open('trace.pkl', 'rb') as f:
+path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "trace.pkl")
+with open(path, 'rb') as f:
     trace = pickle.load(f)
 
 interpolation_steps = 100 #steps between each trace keyframe
