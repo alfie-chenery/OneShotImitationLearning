@@ -60,16 +60,22 @@ class FrankaArmEnvironment:
 
     def robotGetCameraSnapshot(self):
         pos, orn, _, _, _, _ = p.getLinkState(self.robotId, self.eefId, computeForwardKinematics=True)
-        rotation_matrix = p.getMatrixFromQuaternion(orn)
-        rotation_matrix = np.array(rotation_matrix).reshape(3, 3)
+        rotationMatrix = p.getMatrixFromQuaternion(orn)
+        rotationMatrix = np.array(rotationMatrix).reshape(3, 3)
         # Initial vectors
-        init_camera_vector = (0, 0, 1) # z-axis
-        init_up_vector = (0, 1, 0) # y-axis
+        initCameraVector = (0, 0, 1) # z-axis
+        initUpVector = (0, 1, 0) # y-axis
         # Rotated vectors
-        camera_vector = rotation_matrix.dot(init_camera_vector)
-        up_vector = rotation_matrix.dot(init_up_vector)
-        view_matrix = p.computeViewMatrix(pos, pos + 0.1 * camera_vector, up_vector)
-        img = p.getCameraImage(self.imgSize, self.imgSize, view_matrix, self.projectionMatrix)
+        cameraVector = rotationMatrix.dot(initCameraVector)
+        upVector = rotationMatrix.dot(initUpVector)
+        viewMatrix = p.computeViewMatrix(pos, pos + 0.1 * cameraVector, upVector)
+
+        img = p.getCameraImage(self.imgSize, self.imgSize, viewMatrix, self.projectionMatrix)
+        # img :: ( width::int,
+        #          height::int,
+        #          rgbPixels::list of [R,G,B,A] [0..width*height],
+        #          depthPixels::list of float [0..width*height],
+        #          segmentationMaskBuffer::list of int [0..width*height] )
         return img
 
 
@@ -87,7 +93,7 @@ class FrankaArmEnvironment:
     #     plt.imsave('depth.jpg', depth_buffer_opengl)
 
 
-    def setCameraPos(self, cameraDist, cameraYaw, cameraPitch):
+    def setDebugCameraPos(self, cameraDist, cameraYaw, cameraPitch):
         p.resetDebugVisualizerCamera(cameraDist, cameraYaw, cameraPitch, [0,0,0])
 
 
