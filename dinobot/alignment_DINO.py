@@ -23,6 +23,11 @@ def find_transformation(X, Y):
     return R, t
 
 
+def add_depth(points, depth):
+    return [(y,x, depth[y,x]) for (y,x) in points]
+
+
+
 #Hyperparameters for DINO correspondences extraction
 num_pairs = 8
 load_size = 224

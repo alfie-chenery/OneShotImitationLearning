@@ -68,6 +68,11 @@ def find_transformation(X, Y):
     return R, t
 
 
+def add_depth(points, depth):
+    return [(y,x, depth[y,x]) for (y,x) in points]
+
+
+
 #Create a cosine similarity object
 cos_sim = torch.nn.CosineSimilarity(dim=1, eps=1e-08)
 
@@ -82,5 +87,4 @@ for a in ["mouse", "bottle"]:
 #Robot arm environment
 env = environment.FrankaArmEnvironment()
 
-while True:
-    env.stepEnv()
+env.robotGetCameraSnapshot()

@@ -3,6 +3,7 @@ import time
 import pybullet_data
 import math
 import random
+import keyboard
 
 p.connect(p.GUI)#or p.DIRECT for non-graphical version
 p.resetSimulation()
@@ -16,10 +17,23 @@ armId = p.loadURDF("franka_panda/panda.urdf", [0,0,0], startOrientation, useFixe
 numJoints = p.getNumJoints(armId)
 end_effector_id = numJoints - 1
 
+ignore_joints = [7,8,11] #these joints are fixed and so nverse kinematics ignores them
+# in fact it returns a list of 9 elements because we only have 9 degrees of freedom not 12
+links = [0,1,2,3,4,5,6,9,10]
+
+for i in range(numJoints):
+    print(f"{i}: {p.getJointInfo(armId, i)[8]}, {p.getJointInfo(armId, i)[9]}")
+
+
 for i in range (10000):
+
     pos, _ = p.getBasePositionAndOrientation(blockId)
-    orn = [0,0,0,1]
-    jointPoses = p.calculateInverseKinematics(armId, end_effector_id, pos, orn)
+    orn = p.getQuaternionFromEuler([1,0,0])
+    jointPoses = list(p.calculateInverseKinematics(armId, end_effector_id, pos, orn))
+    
+    for i in ignore_joints:
+        jointPoses.insert(i, 0)
+
     forces=[500.0]*len(jointPoses)
 
     p.setJointMotorControlArray(armId, 

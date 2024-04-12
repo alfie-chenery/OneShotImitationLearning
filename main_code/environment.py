@@ -15,18 +15,24 @@ class FrankaArmEnvironment:
 
     def startEnv(self):
         #set object variables
-        self.robotId = p.loadURDF("franka_panda/panda.urdf", [0,0,0], [0,0,0,1], useFixedBase=True)
         self.planeId = p.loadURDF("plane.urdf")
-        self.numJoints = p.getNumJoints(self.robotId)
-        self.eefId = self.numJoints - 1
+        self.robotId = p.loadURDF("franka_panda/panda.urdf", [0,0,0], [0,0,0,1], useFixedBase=True)
         self.obj1Id = p.loadURDF("quadruped/quadruped.urdf", [0,0.1,0.3], [0,0,0,1])
 
+        self.numJoints = p.getNumJoints(self.robotId)
+        self.fixed_joints = [7,8,11] #These joints are fixed and cannot move
+        self.eefId = self.numJoints - 1
+        self.dof = self.numJoints - len(self.fixed_joints)
+
         self.imgSize = 1000
-        self.fov = 60
-        self.aspect = 1.0
-        self.nearplane = 0.01
+        self.fov = 60 #degrees?
+        self.aspect = 1.0     # leave as 1 for square image
+        self.nearplane = 0.01 # wtf are these units? gotta figure that out
         self.farplane = 100
         self.projectionMatrix = p.computeProjectionMatrixFOV(self.fov, self.aspect, self.nearplane, self.farplane)
+        print("Projection matrix")
+        print(np.array(self.projectionMatrix).reshape((4,4)))
+        print("")
 
 
     def stepEnv(self):
@@ -39,14 +45,16 @@ class FrankaArmEnvironment:
         p.disconnect()
 
 
-    def getJointAngles(self):
+    def robotGetJointAngles(self):
         return [p.getJointState(self.robotId, i)[0] for i in range(self.numJoints)]
     
 
-    def setJointAngles(self, desiredAngles, interpolationSteps=100):
+    def robotSetJointAngles(self, desiredAngles, interpolationSteps=100):
+        #Desired angles should be a list of size 12. Even though joints 7,8,11 are fixed and the values
+        # will be ignored, the list needs to be size 12
         for i in range(interpolationSteps):
             alpha = (i+1) / interpolationSteps
-            interpolatedPosition = [(1 - alpha) * prev + alpha * desired for prev, desired in zip(self.getJointAngles(), desiredAngles)]
+            interpolatedPosition = [(1 - alpha) * prev + alpha * desired for prev, desired in zip(self.robotGetJointAngles(), desiredAngles)]
             forces = [500.0] * len(interpolatedPosition)
 
             p.setJointMotorControlArray(self.robotId, 
@@ -56,12 +64,50 @@ class FrankaArmEnvironment:
                                         forces=forces)
             
             #self.stepEnv()
+            #step env is probably needed. Its definatley needed to see the movement, but i wonder if
+            # setting to the goal state is actually fine and it moves smoothly or if the robot will just
+            # snap there. If we remove this and let the environment step only in the main loop,
+            # then interpolation steps arent needed
+
+            #could also make the environment store a buffer of desired positions and step through them,
+            # this would let us fill it with the interpolated steps, and the movements happen only
+            # when env.step happens in the main loop. It feels kind of desireable to have env.step only
+            # in the main loop, since otherwise these movement functions are blocking until its done moving
+
+
+    def robotGetEefPosition(self):
+        pos, orn, _, _, _, _ = p.getLinkState(self.robotId, self.eefId, computeForwardKinematics=True)
+        return pos, orn
+
+
+    def robotSetEefPosition(self, pos, orn):
+        jointAngles = p.calculateInverseKinematics(self.robotId, self.eefId, pos, orn)
+
+        for i in self.fixed_joints:
+            jointAngles.insert(i, 0)
+        #inverse kinematics returns a list of size dof (for this robot 9)
+        # but when setting joint angles we expect to set every joint (all 12, even though the fixed ones will be ignored)
+        # easiest to add dummy values for these joints before setting angles, they will be ignored anyway
+
+        self.robotSetJointAngles(jointAngles)
+
+
+    def robotMoveEefPosition(self, translation, rotation):
+        pos, orn = self.robotGetEefPosition()
+        self.robotSetEefPosition(pos + translation, orn + rotation)
+        #definately wrong, not sure if rotation is a matrix
+        #probably something like convert orn to euler then do rotation matrix
 
 
     def robotGetCameraSnapshot(self):
-        pos, orn, _, _, _, _ = p.getLinkState(self.robotId, self.eefId, computeForwardKinematics=True)
+        pos, orn = self.robotGetEefPosition()
         rotationMatrix = p.getMatrixFromQuaternion(orn)
-        rotationMatrix = np.array(rotationMatrix).reshape(3, 3)
+        rotationMatrix = np.array(rotationMatrix).reshape((3, 3))
+
+        print("Rotation matrix")
+        print(rotationMatrix)
+        print("")
+
         # Initial vectors
         initCameraVector = (0, 0, 1) # z-axis
         initUpVector = (0, 1, 0) # y-axis
@@ -70,13 +116,18 @@ class FrankaArmEnvironment:
         upVector = rotationMatrix.dot(initUpVector)
         viewMatrix = p.computeViewMatrix(pos, pos + 0.1 * cameraVector, upVector)
 
-        img = p.getCameraImage(self.imgSize, self.imgSize, viewMatrix, self.projectionMatrix)
-        # img :: ( width::int,
-        #          height::int,
-        #          rgbPixels::list of [R,G,B,A] [0..width*height],
-        #          depthPixels::list of float [0..width*height],
-        #          segmentationMaskBuffer::list of int [0..width*height] )
-        return img
+        print("View matrix")
+        print(np.array(viewMatrix).reshape((4,4)))
+        print("")
+
+        width, height, rgbPixels, depthPixels, segmentationBuffer = p.getCameraImage(self.imgSize, self.imgSize, viewMatrix, self.projectionMatrix)
+        rgb = np.array(rgbPixels).reshape((width, height, 4))
+        depth = np.array(depthPixels).reshape((width, height))
+        depth = self.farplane * self.nearplane / (self.farplane - (self.farplane - self.nearplane) * depth)
+        segmentation = np.array(segmentationBuffer).reshape((width, height))
+        segmentation = segmentation * 1.0 / 255.0
+        
+        return (width, height, rgb, depth, segmentation)
 
 
     # def save_snapshot(img):
