@@ -92,17 +92,17 @@ class FrankaArmEnvironment:
         self.robotSetJointAngles(jointAngles)
 
 
-    def robotMoveEefPosition(self, translation, rotation):
+    def robotMoveEefPosition(self, translation, rotationMatrix):
         pos, orn = self.robotGetEefPosition()
-        self.robotSetEefPosition(pos + translation, orn + rotation)
-        #definately wrong, not sure if rotation is a matrix
-        #probably something like convert orn to euler then do rotation matrix
+        ornMatrix = np.array(p.getMatrixFromQuaternion(orn)).reshape((3,3))
+        self.robotSetEefPosition(pos + translation, np.dot(ornMatrix, rotationMatrix))
+        
+        #might be a problem. orn is now a 3x3 rotation matrix but I think the later code is expecting a quaternion
 
 
     def robotGetCameraSnapshot(self):
         pos, orn = self.robotGetEefPosition()
-        rotationMatrix = p.getMatrixFromQuaternion(orn)
-        rotationMatrix = np.array(rotationMatrix).reshape((3, 3))
+        rotationMatrix = np.array(p.getMatrixFromQuaternion(orn)).reshape((3, 3))
 
         print("Rotation matrix")
         print(rotationMatrix)

@@ -56,6 +56,7 @@ if __name__ == "__main__":
 
             #A function to convert pixel distance into meters based on calibration of camera.
             t_meters = convert_pixels_to_meters(t)
+            #I think its 1 pixel is 1mm according to some sources
 
             #Move robot
             robot.move(t_meters,R)
