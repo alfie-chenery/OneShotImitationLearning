@@ -82,7 +82,7 @@ class FrankaArmEnvironment:
                                         targetPositions=interpolatedPosition,
                                         forces=forces)
             
-            #self.stepEnv()
+            self.stepEnv()
             #step env is probably needed. Its definatley needed to see the movement, but i wonder if
             # setting to the goal state is actually fine and it moves smoothly or if the robot will just
             # snap there. If we remove this and let the environment step only in the main loop,

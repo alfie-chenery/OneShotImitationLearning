@@ -99,8 +99,6 @@ _,_,rgb,depth,_ = env.robotGetCameraSnapshot()
 img = Image.fromarray(rgb)
 img.show()
 env.save_snapshot(rgb)
-exit()
-
 
 env.robotMoveEefPosition([0,0,0], np.eye(3))
 for i in range(500):
@@ -112,7 +110,7 @@ for i in range(500):
 
 
 _, _, rgb_bn, depth_bn, _ = env.robotGetCameraSnapshot()
-Error = 100000
+error = 100000
 ERR_THRESHOLD = 50 #A generic error between the two sets of points
 
 while error > ERR_THRESHOLD:
