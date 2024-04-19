@@ -3,6 +3,7 @@ import time
 import pybullet_data
 import pickle
 import os
+import numpy as np
 
 p.connect(p.GUI)
 p.resetSimulation()
@@ -11,6 +12,7 @@ p.setGravity(0,0,-10)
 
 planeId = p.loadURDF("plane.urdf")
 armId = p.loadURDF("franka_panda/panda.urdf", [0,0,0], [0,0,0,1], useFixedBase=True)
+tableId = p.loadURDF("table/table.urdf", [0.6,0,-0.2], p.getQuaternionFromEuler([0,0,np.pi/2]))
 numJoints = p.getNumJoints(armId)
 end_effector_id = numJoints - 1
 

@@ -2,6 +2,12 @@ import pybullet as p
 import pybullet_data
 import numpy as np
 import time
+from datetime import datetime
+import os
+#import quaternion
+from quat_utils import quaternion_from_matrix
+from PIL import Image
+
     
 
 class FrankaArmEnvironment:
@@ -17,14 +23,27 @@ class FrankaArmEnvironment:
         #set object variables
         self.planeId = p.loadURDF("plane.urdf")
         self.robotId = p.loadURDF("franka_panda/panda.urdf", [0,0,0], [0,0,0,1], useFixedBase=True)
-        self.obj1Id = p.loadURDF("quadruped/quadruped.urdf", [0,0.1,0.3], [0,0,0,1])
+        self.tableId = p.loadURDF("table/table.urdf", [0.6,0,-0.2], p.getQuaternionFromEuler([0,0,np.pi/2]))
 
         self.numJoints = p.getNumJoints(self.robotId)
         self.fixed_joints = [7,8,11] #These joints are fixed and cannot move
         self.eefId = self.numJoints - 1
         self.dof = self.numJoints - len(self.fixed_joints)
 
-        self.imgSize = 1000
+        self.lowerLimits = []
+        self.upperLimits = []
+        self.jointRanges = []
+        self.restPoses = [-0.0016406124581102627, 0.026211667016220668, 0.002989846306765971, -0.9495545304254569, -5.895048550690606e-05, 1.2393585715718878, -1.7747677120392198e-05, 0.0, 0.0, -9.177073744494914e-20, 0.00065723506632391, 0.0]
+        for i in range(self.numJoints):
+            jointInfo = p.getJointInfo(self.robotId, i)
+            self.lowerLimits.append(jointInfo[8])
+            self.upperLimits.append(jointInfo[9])
+            self.jointRanges.append(jointInfo[9] - jointInfo[8])
+            
+            p.resetJointState(self.robotId, i, self.restPoses[i])
+        self.useNullSpace = False
+
+        self.imgSize = 224
         self.fov = 60 #degrees?
         self.aspect = 1.0     # leave as 1 for square image
         self.nearplane = 0.01 # wtf are these units? gotta figure that out
@@ -80,8 +99,11 @@ class FrankaArmEnvironment:
         return pos, orn
 
 
-    def robotSetEefPosition(self, pos, orn):
-        jointAngles = p.calculateInverseKinematics(self.robotId, self.eefId, pos, orn)
+    def robotSetEefPosition(self, pos, orn=None):
+        if self.useNullSpace:
+            jointAngles = list(p.calculateInverseKinematics(self.robotId, self.eefId, pos, orn, self.lowerLimits, self.upperLimits, self.jointRanges, self.restPoses))
+        else:
+            jointAngles = list(p.calculateInverseKinematics(self.robotId, self.eefId, pos, orn))
 
         for i in self.fixed_joints:
             jointAngles.insert(i, 0)
@@ -94,10 +116,15 @@ class FrankaArmEnvironment:
 
     def robotMoveEefPosition(self, translation, rotationMatrix):
         pos, orn = self.robotGetEefPosition()
+        posVec = np.array(pos)
         ornMatrix = np.array(p.getMatrixFromQuaternion(orn)).reshape((3,3))
-        self.robotSetEefPosition(pos + translation, np.dot(ornMatrix, rotationMatrix))
+
+        print(f"Rotation: {orn}, {ornMatrix}")
+
+        self.robotSetEefPosition(posVec + translation, quaternion_from_matrix(np.dot(ornMatrix, rotationMatrix)))
         
-        #might be a problem. orn is now a 3x3 rotation matrix but I think the later code is expecting a quaternion
+        #find a module to do the matrix to quat for me. ChatGPT solution seems dodgy
+        # removing the need for quat_utils file
 
 
     def robotGetCameraSnapshot(self):
@@ -121,7 +148,7 @@ class FrankaArmEnvironment:
         print("")
 
         width, height, rgbPixels, depthPixels, segmentationBuffer = p.getCameraImage(self.imgSize, self.imgSize, viewMatrix, self.projectionMatrix)
-        rgb = np.array(rgbPixels).reshape((width, height, 4))
+        rgb = np.array(rgbPixels).reshape((width, height, 4)).astype(np.uint8)
         depth = np.array(depthPixels).reshape((width, height))
         depth = self.farplane * self.nearplane / (self.farplane - (self.farplane - self.nearplane) * depth)
         segmentation = np.array(segmentationBuffer).reshape((width, height))
@@ -130,18 +157,14 @@ class FrankaArmEnvironment:
         return (width, height, rgb, depth, segmentation)
 
 
-    # def save_snapshot(img):
-    #     #img = p.getCameraImage(224, 224, shadow = False, renderer=p.ER_BULLET_HARDWARE_OPENGL)
-    #     rgb_opengl = (np.reshape(img[2], (img_size, img_size, 4)))
-    #     depth_buffer_opengl = np.reshape(img[3], [img_size, img_size])
-    #     depth_opengl = farplane * nearplane / (farplane - (farplane - nearplane) * depth_buffer_opengl)
-    #     seg_opengl = np.reshape(img[4], [img_size, img_size]) * 1. / 255.
+    def save_snapshot(self, rgb):
+        img = Image.fromarray(rgb)
+        img = img.convert("RGB") #remove alpha
 
-    #     rgbim = Image.fromarray(rgb_opengl)
-    #     rgbim_no_alpha = rgbim.convert('RGB')
-
-    #     rgbim_no_alpha.save('rgb.jpg')
-    #     plt.imsave('depth.jpg', depth_buffer_opengl)
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        print(timestamp)
+        img.save(f"{dir_path}\\out\\snapshots\\snapshot-{timestamp}.jpg")
 
 
     def setDebugCameraPos(self, cameraDist, cameraYaw, cameraPitch):
@@ -154,3 +177,31 @@ class FrankaArmEnvironment:
 
     def disableWireframe(self):
         p.configureDebugVisualizer(p.COV_ENABLE_WIREFRAME, 0)
+
+
+
+#Testing
+if __name__ == "__main__":
+    env = FrankaArmEnvironment()
+    targetPosXId = p.addUserDebugParameter("targetPosX",-1,1,0.5)
+    targetPosYId = p.addUserDebugParameter("targetPosY",-1,1,0)
+    targetPosZId = p.addUserDebugParameter("targetPosZ",-1,1,0.5)
+    nullSpaceId = p.addUserDebugParameter("nullSpace",0,1,1)
+    targetOrnRollId = p.addUserDebugParameter("targetOrnRoll",-np.pi,np.pi,0)
+    targetOrnPitchId = p.addUserDebugParameter("targetOrnPitch",-np.pi,np.pi,0)
+    targetOrnYawId = p.addUserDebugParameter("targetOrnYaw",-np.pi,np.pi,0)
+
+    while True:
+        targetPosX = p.readUserDebugParameter(targetPosXId)
+        targetPosY = p.readUserDebugParameter(targetPosYId)
+        targetPosZ = p.readUserDebugParameter(targetPosZId)
+        nullSpace = p.readUserDebugParameter(nullSpaceId)
+        targetOrnRoll = p.readUserDebugParameter(targetOrnRollId)
+        targetOrnPitch = p.readUserDebugParameter(targetOrnPitchId)
+        targetOrnYaw = p.readUserDebugParameter(targetOrnYawId)
+    
+        targetPosition = [targetPosX,targetPosY,targetPosZ]
+        targetOrn = [targetOrnRoll,targetOrnPitch,targetOrnYaw]
+        env.useNullSpace = nullSpace > 0.5
+        env.robotSetEefPosition(targetPosition, p.getQuaternionFromEuler(targetOrn))
+        env.stepEnv()

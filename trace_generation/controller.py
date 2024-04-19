@@ -59,6 +59,10 @@ class Controller():
                 self.DPadDown,
                 self.Start,
                 self.Menu]
+    
+
+    def nonePressed(self):
+        return all(v == 0 for v in self.readAll())
 
 
     def _monitor_controller(self):

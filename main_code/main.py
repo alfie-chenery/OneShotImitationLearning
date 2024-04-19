@@ -40,6 +40,7 @@ def loadImages():
     i = 0
     for path in glob.glob(dir_path + "\\image_snapshots\\*.jpg"):
         img = Image.open(path)
+        img.show()
         img = image_transforms(img)
         img = img.unsqueeze(0)
         emb = dino(img)
@@ -73,6 +74,12 @@ def add_depth(points, depth):
     return [(y,x, depth[y,x]) for (y,x) in points]
 
 
+def compute_error(points1, points2):
+    np1 = np.array(points1)
+    np2 = np.array(points2)
+    return np.linalg.norm(np1 - np2)
+
+
 
 #Create a cosine similarity object
 cos_sim = torch.nn.CosineSimilarity(dim=1, eps=1e-08)
@@ -87,13 +94,29 @@ for a in ["mouse", "bottle"]:
 
 #Robot arm environment
 env = environment.FrankaArmEnvironment()
+_,_,rgb,depth,_ = env.robotGetCameraSnapshot()
 
-_,_,rgb_bn, depth_bn = env.robotGetCameraSnapshot()
+img = Image.fromarray(rgb)
+img.show()
+env.save_snapshot(rgb)
+exit()
+
+
+env.robotMoveEefPosition([0,0,0], np.eye(3))
+for i in range(500):
+    env.stepEnv()
+env.robotMoveEefPosition([0,-0.5,0], np.eye(3))
+for i in range(500):
+    env.stepEnv()
+
+
+
+_, _, rgb_bn, depth_bn, _ = env.robotGetCameraSnapshot()
 Error = 100000
 ERR_THRESHOLD = 50 #A generic error between the two sets of points
 
 while error > ERR_THRESHOLD:
-    rgb_live, depth_live = env.robotGetCameraSnapshot()
+    _, _, rgb_live, depth_live, _ = env.robotGetCameraSnapshot()
     with torch.no_grad():
         points1, points2, image1_pil, image2_pil = find_correspondences(rgb_live, rgb_bn, num_pairs, load_size, layer,
                                                                             facet, bin, thresh, model_type, stride)
