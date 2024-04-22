@@ -128,6 +128,14 @@ class FrankaArmEnvironment:
 
 
     def robotGetCameraSnapshot(self):
+        """
+        Get camera snapshot as mounted on end effector
+        Returns: (width, height, rgb, depthBuffer, segmentation)
+          width, height :: int, of all images
+          rgb :: numpy array of rgb values 0-255
+          depthBuffer :: numpy array of depth proportions 0-255. To calculate actual depth pass to env.calculateDepthFromBuffer()
+          segmentation :: numpy array of segmentation map   TODO: work out the range of values, i dont actually use this anywhere yet
+        """
         pos, orn = self.robotGetEefPosition()
         rotationMatrix = np.array(p.getMatrixFromQuaternion(orn)).reshape((3, 3))
 
@@ -149,22 +157,40 @@ class FrankaArmEnvironment:
 
         width, height, rgbPixels, depthPixels, segmentationBuffer = p.getCameraImage(self.imgSize, self.imgSize, viewMatrix, self.projectionMatrix)
         rgb = np.array(rgbPixels).reshape((width, height, 4)).astype(np.uint8)
-        depth = np.array(depthPixels).reshape((width, height))
-        depth = self.farplane * self.nearplane / (self.farplane - (self.farplane - self.nearplane) * depth)
+        depthBuffer = np.array(depthPixels).reshape((width, height))
+        depthBuffer = (depthBuffer * 255).astype(np.uint8)
         segmentation = np.array(segmentationBuffer).reshape((width, height))
         segmentation = segmentation * 1.0 / 255.0
         
-        return (width, height, rgb, depth, segmentation)
+        return (width, height, rgb, depthBuffer, segmentation)
 
 
-    def save_snapshot(self, rgb):
-        img = Image.fromarray(rgb)
-        img = img.convert("RGB") #remove alpha
+    def robotSaveCameraSnapshot(self, filename, path="", rgb=None, depthBuffer=None):
+        """
+        Filename should NOT include a file extension
+        Path: Optional relative path to folder
+        Can pass rgb AND depth buffer or automatically call robotGetCameraSnapshot if not provided
+          If either is not provided, both will be overwritten with an internal call
+        """
+        if (rgb is None) or (depthBuffer is None):
+            _, _, rgb, depthBuffer, _ = self.robotGetCameraSnapshot()
+        
+        #timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-        print(timestamp)
-        img.save(f"{dir_path}\\out\\snapshots\\snapshot-{timestamp}.jpg")
+        rgbImg = Image.fromarray(rgb)
+        rgbImg = rgbImg.convert("RGB") #RGB, no alpha channel
+
+        depthImg = Image.fromarray(depthBuffer)
+        depthImg = rgbImg.convert("L") #Luminosity (single greyscale channel) no alpha
+
+        rgbImg.save(f"{path}-rgb\\{filename}.jpg")
+        depthImg.save(f"{path}-depth\\{filename}.jpg")
+
+    
+    def calculateDepthFromBuffer(self, depthBuffer):
+        depthBuffer = depthBuffer.astype(np.float32) * 1.0 / 255.0
+        depth = self.farplane * self.nearplane / (self.farplane - (self.farplane - self.nearplane) * depthBuffer)
+        return depth
 
 
     def setDebugCameraPos(self, cameraDist, cameraYaw, cameraPitch):

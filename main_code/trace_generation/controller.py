@@ -3,6 +3,9 @@ from math import pow
 import threading
 
 class Controller():
+    """
+    Wrapper class to make reading controller inputs much nicer to work with
+    """
     def __init__(self):
 
         self.TRIGGER_MAX_VALUE = pow(2, 8)
@@ -38,7 +41,7 @@ class Controller():
         self._monitor_thread.start()
 
 
-    def readAll(self): # return the buttons/triggers that you care about in this methode
+    def readAll(self):
         return [self.LeftJoystickX,
                 self.LeftJoystickY,
                 self.RightJoystickX,

@@ -3,6 +3,7 @@ import torch
 import numpy as np 
 import torchvision.transforms as T
 from PIL import Image
+import pickle
 import glob
 import os
 from dinofeatures.correspondences import find_correspondences
@@ -18,7 +19,6 @@ thresh=0.05
 model_type='dino_vitb8'
 stride=4
 
-
 #Download and load DINO
 dino = torch.hub.load('facebookresearch/dino:main', 'dino_vitb8')
 
@@ -30,25 +30,40 @@ image_transforms = T.Compose([
     T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
 ])
 
-imageEmbeddings = {}
 
-
-def loadImages():
-    #Load saved images and embed using transformer
+def loadDemonstrations():
+    """
+    Load demonstations and context images. Automatically emed using image transformer
+    """
+    demonstrations = {}
     dir_path = os.path.dirname(os.path.realpath(__file__))
 
     i = 0
-    for path in glob.glob(dir_path + "\\image_snapshots\\*.jpg"):
-        img = Image.open(path)
-        img.show()
-        img = image_transforms(img)
-        img = img.unsqueeze(0)
-        emb = dino(img)
+    for path in glob.glob(dir_path + "\\demonstrations\\*.pkl"):
+        try:
+            name = path.split("\\")[-1].split(".")[0]
 
-        imageEmbeddings[path.split("\\")[-1].split(".")[0]] = emb
-        i += 1
-    
-    print(f"Successfully loaded {i} images")
+            with open(path, 'rb') as f:
+                trace = pickle.load(f)
+
+            rgb = Image.open(dir_path + f"\\{name}-rgb.jpg")
+            rgb = image_transforms(rgb)
+            rgb = rgb.unsqueeze(0)
+            emb = dino(rgb)
+
+            depth = Image.open(dir_path + f"\\{name}-depth.jpg")
+
+            #TODO do i want to store the rgb and in what form? we defo need depth to add it back in for find correspondences, but is rgb necessary or do i just need embedding?
+            # actually what do i even want to store here. Find correspodences weirdly opens PIl images itself from filenames, so maybe some of this is better openned on the fly
+            # yeah probably best not to do that here. we select the single demonstration to follow from embeding. Then we can only open the rgb and depth file for the ONE demo we use, not all of them
+
+            demonstrations[name] = (emb, trace, rgb, depth)
+            i += 1
+        except:
+            print("An error occured with one of the demonstrations")
+
+    print(f"Successfully loaded {i} demonstrations")
+    return demonstrations
 
 
 def find_transformation(X, Y):
@@ -71,7 +86,9 @@ def find_transformation(X, Y):
 
 
 def add_depth(points, depth):
+    #probably calculate actual depth from buffer here using env.calculateDepthFromBuffer()
     return [(y,x, depth[y,x]) for (y,x) in points]
+    #also check that the points are of the form (y,x) it seems like it but test
 
 
 def compute_error(points1, points2):
@@ -84,37 +101,27 @@ def compute_error(points1, points2):
 #Create a cosine similarity object
 cos_sim = torch.nn.CosineSimilarity(dim=1, eps=1e-08)
 
-loadImages()
-
-#Compute cosine similarities
-for a in ["mouse", "bottle"]:
-    for b in ["wallet", "rat"]:
-        print(a,b)
-        print(cos_sim(imageEmbeddings[a], imageEmbeddings[b]))
+demos = loadDemonstrations()
 
 #Robot arm environment
 env = environment.FrankaArmEnvironment()
-_,_,rgb,depth,_ = env.robotGetCameraSnapshot()
 
-img = Image.fromarray(rgb)
-img.show()
-env.save_snapshot(rgb)
+_, _, rgb_bn, depth_bn, _ = env.robotGetCameraSnapshot() 
+#take picture, find the demo which matches the image the best
+#select bottleneck image
 
-env.robotMoveEefPosition([0,0,0], np.eye(3))
-for i in range(500):
-    env.stepEnv()
-env.robotMoveEefPosition([0,-0.5,0], np.eye(3))
-for i in range(500):
-    env.stepEnv()
+# #Compute cosine similarities
+# for a in ["mouse", "bottle"]:
+#     for b in ["wallet", "rat"]:
+#         print(a,b)
+#         print(cos_sim(imageEmbeddings[a], imageEmbeddings[b]))
 
 
-
-_, _, rgb_bn, depth_bn, _ = env.robotGetCameraSnapshot()
 error = 100000
 ERR_THRESHOLD = 50 #A generic error between the two sets of points
 
 while error > ERR_THRESHOLD:
-    _, _, rgb_live, depth_live, _ = env.robotGetCameraSnapshot()
+    _, _, rgb_live, depth_live, _ = env.robotGetCameraSnapshot() #save live image into temp
     with torch.no_grad():
         points1, points2, image1_pil, image2_pil = find_correspondences(rgb_live, rgb_bn, num_pairs, load_size, layer,
                                                                             facet, bin, thresh, model_type, stride)

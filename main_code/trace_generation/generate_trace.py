@@ -1,12 +1,8 @@
 import pybullet as p
-from main_code import environment
-import time
+import environment
 import pickle
 import os
 from controller import Controller
-
-controller = Controller()
-env = environment.FrankaArmEnvironment()
 
 def Clamp(val, low, high):
     if val < low:
@@ -18,6 +14,9 @@ def Clamp(val, low, high):
 
 
 def main():
+    controller = Controller()
+    env = environment.FrankaArmEnvironment()
+
     cameraMoveSpeed = 0.5
     cameraYaw = 50.0
     cameraPitch = -35.0
@@ -32,18 +31,21 @@ def main():
 
     trace = [env.robotGetJointAngles()]    #The trace so far. trace[-1] is the last keyframe added
     saveTrace = True
+    snapshot = None
     debounce = False #button debounce, prevents holding button affecting multiple times
+    wireframe = False
+    p.setDebugObjectColor(env.robotId, current_joint, objectDebugColorRGB=[255,0,0]) #force set so the first time activating wireframe doesnt behave weird
 
     while True:
 
         if controller.LeftBumper and not debounce: #move to previous joint
-            p.setDebugObjectColor(env.robotId, current_joint)
+            p.setDebugObjectColor(env.robotId, current_joint) #no colour resets to default
             current_joint = Clamp(current_joint - 1, 0, env.numJoints - 1)
             p.setDebugObjectColor(env.robotId, current_joint, objectDebugColorRGB=[255,0,0])
             debounce = True
             
         if controller.RightBumper and not debounce: #move to next joint
-            p.setDebugObjectColor(env.robotId, current_joint)
+            p.setDebugObjectColor(env.robotId, current_joint) #no colour resets to default
             current_joint = Clamp(current_joint + 1, 0, env.numJoints - 1)
             p.setDebugObjectColor(env.robotId, current_joint, objectDebugColorRGB=[255,0,0])
             debounce = True
@@ -71,13 +73,15 @@ def main():
             print("saved current as keyframe")
 
         if controller.DPadUp and not debounce:
-            p.setDebugObjectColor(env.robotId, current_joint, objectDebugColorRGB=[255,0,0])
-            p.configureDebugVisualizer(p.COV_ENABLE_WIREFRAME, 1)
+            wireframe = not wireframe
+            p.configureDebugVisualizer(p.COV_ENABLE_WIREFRAME, int(wireframe))
             debounce = True
+            print("toggled wireframe " + ("on" if wireframe else "off"))
 
         if controller.DPadDown and not debounce:
-            p.configureDebugVisualizer(p.COV_ENABLE_WIREFRAME, 0)
+            _, _, snapshot, _, _ = env.robotGetCameraSnapshot()
             debounce = True
+            print("taken snapshot")
 
         #eft joystick controls joints
         joints = env.robotGetJointAngles()
@@ -91,7 +95,7 @@ def main():
         cameraDist -= cameraMoveSpeed * controller.RightTrigger
         p.resetDebugVisualizerCamera(cameraDist, cameraYaw, cameraPitch, [0,0,0])
 
-        if controller.nonePressed():
+        if controller.nonePressed(): #once button released, disable debounce, allowing a new button to be registered
             debounce = False
 
         if controller.Start: #quit without saving
@@ -103,19 +107,24 @@ def main():
             break
             
 
-        p.stepSimulation()
-        time.sleep(1./240.)
+        env.stepEnv()
 
-
-    p.disconnect()
 
     print("")
     print(trace)
     
     if saveTrace:
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "trace.pkl")
+        dir_path = os.path.dirname(os.path.abspath(__file__))
+        path = os.path.join(dir_path, "trace.pkl")
         with open(path, 'wb') as f:
             pickle.dump(trace, f)
+
+        env.robotSaveCameraSnapshot("trace_snapshot", dir_path, snapshot)
+        print("\nSuccessfully saved trace")
+    else:
+        print("\nQuit without saving trace")
+    
+    env.closeEnv()
 
     
 if __name__ == "__main__":
