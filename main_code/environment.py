@@ -2,9 +2,6 @@ import pybullet as p
 import pybullet_data
 import numpy as np
 import time
-from datetime import datetime
-import os
-#import quaternion
 from quat_utils import quaternion_from_matrix
 from PIL import Image
 
@@ -24,6 +21,7 @@ class FrankaArmEnvironment:
         self.planeId = p.loadURDF("plane.urdf")
         self.robotId = p.loadURDF("franka_panda/panda.urdf", [0,0,0], [0,0,0,1], useFixedBase=True)
         self.tableId = p.loadURDF("table/table.urdf", [0.6,0,-0.2], p.getQuaternionFromEuler([0,0,np.pi/2]))
+        self.objectId = p.loadURDF("urdf/mug.urdf", [0.8, 0, 0.5], [0,0,0,1])
 
         self.numJoints = p.getNumJoints(self.robotId)
         self.fixed_joints = [7,8,11] #These joints are fixed and cannot move
@@ -181,13 +179,17 @@ class FrankaArmEnvironment:
         rgbImg = rgbImg.convert("RGB") #RGB, no alpha channel
 
         depthImg = Image.fromarray(depthBuffer)
-        depthImg = rgbImg.convert("L") #Luminosity (single greyscale channel) no alpha
+        depthImg = depthImg.convert("L") #Luminosity (single greyscale channel) no alpha
 
-        rgbImg.save(f"{path}-rgb\\{filename}.jpg")
-        depthImg.save(f"{path}-depth\\{filename}.jpg")
+        rgbImg.save(f"{path}\\{filename}-rgb.jpg")
+        depthImg.save(f"{path}\\{filename}-depth.jpg")
 
     
     def calculateDepthFromBuffer(self, depthBuffer):
+        """
+        Convert depth buffer (a 2d numpy array of image values 0-255) to an
+        array of the same size, with values which store the actual depth values
+        """
         depthBuffer = depthBuffer.astype(np.float32) * 1.0 / 255.0
         depth = self.farplane * self.nearplane / (self.farplane - (self.farplane - self.nearplane) * depthBuffer)
         return depth
@@ -211,9 +213,9 @@ if __name__ == "__main__":
     env = FrankaArmEnvironment()
     targetPosXId = p.addUserDebugParameter("targetPosX",-1,1,0.5)
     targetPosYId = p.addUserDebugParameter("targetPosY",-1,1,0)
-    targetPosZId = p.addUserDebugParameter("targetPosZ",-1,1,0.5)
+    targetPosZId = p.addUserDebugParameter("targetPosZ",-1,1,1)
     nullSpaceId = p.addUserDebugParameter("nullSpace",0,1,1)
-    targetOrnRollId = p.addUserDebugParameter("targetOrnRoll",-np.pi,np.pi,0)
+    targetOrnRollId = p.addUserDebugParameter("targetOrnRoll",-np.pi,np.pi,np.pi)
     targetOrnPitchId = p.addUserDebugParameter("targetOrnPitch",-np.pi,np.pi,0)
     targetOrnYawId = p.addUserDebugParameter("targetOrnYaw",-np.pi,np.pi,0)
 
