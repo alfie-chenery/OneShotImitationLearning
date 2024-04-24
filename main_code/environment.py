@@ -21,7 +21,7 @@ class FrankaArmEnvironment:
         self.planeId = p.loadURDF("plane.urdf")
         self.robotId = p.loadURDF("franka_panda/panda.urdf", [0,0,0], [0,0,0,1], useFixedBase=True)
         self.tableId = p.loadURDF("table/table.urdf", [0.6,0,-0.2], p.getQuaternionFromEuler([0,0,np.pi/2]))
-        self.objectId = p.loadURDF("urdf/mug.urdf", [0.8, 0, 0.5], [0,0,0,1])
+        self.objectId = p.loadURDF("urdf/mug.urdf", [0.6, 0, 0.5], [0,0,0,1])
 
         self.numJoints = p.getNumJoints(self.robotId)
         self.fixed_joints = [7,8,11] #These joints are fixed and cannot move

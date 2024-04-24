@@ -6,7 +6,8 @@ from PIL import Image
 import pickle
 import glob
 import os
-from dinofeatures.correspondences import find_correspondences
+from dinofeatures.correspondences import find_correspondences, draw_correspondences
+import matplotlib.pyplot as plt
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -17,12 +18,12 @@ layer = 9
 facet = 'key'
 bin=True
 thresh=0.05
-model_type='dino_vitb8'
+model_type='dino_vits8' #vitb8
 stride=4
 ERR_THRESHOLD = 50 #generic error between the two sets of points
 
 #Download and load DINO
-dino = torch.hub.load('facebookresearch/dino:main', 'dino_vitb8')
+dino = torch.hub.load('facebookresearch/dino:main', model_type)
 
 #Create an image transform pipeline
 image_transforms = T.Compose([
@@ -103,6 +104,16 @@ env = environment.FrankaArmEnvironment()
 env.robotSaveCameraSnapshot("initial_scene", dir_path + "\\temp")
 initial_emb = embedImage(dir_path + "\\temp\\initial_scene-rgb.jpg")
 
+emb1 = dir_path + "\\temp\\mouse.jpg"
+emb2 = dir_path + "\\temp\\rat.jpg"
+print("before")
+points1, points2, image1_pil, image2_pil = find_correspondences(emb1, emb2, num_pairs, load_size, layer, facet, bin, thresh, model_type, stride, dino)
+print(points1, points2)
+fig1, fig2 = draw_correspondences(points1, points2, image1_pil, image2_pil)
+fig1.savefig(dir_path + "\\fig1.png", bbox_inches='tight', pad_inches=0)
+fig2.savefig(dir_path + "\\fig2.png", bbox_inches='tight', pad_inches=0)
+print("HELP!")
+
 img_embeddings = loadEmbeddings()
 cos_sim = torch.nn.CosineSimilarity(dim=1, eps=1e-08)
 best = (-1, None)
@@ -125,7 +136,7 @@ while error > ERR_THRESHOLD:
 
     with torch.no_grad():
         points1, points2, image1_pil, image2_pil = find_correspondences(rgb_live_path, rgb_bn_path, num_pairs, load_size, layer,
-                                                                            facet, bin, thresh, model_type, stride)
+                                                                            facet, bin, thresh, model_type, stride, dino)
         #Given the pixel coordinates of the correspondences, add the depth channel
         points1 = add_depth(points1, depth_bn_path)
         points2 = add_depth(points2, depth_live_path)

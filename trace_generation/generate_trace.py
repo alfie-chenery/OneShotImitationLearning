@@ -17,7 +17,7 @@ def main():
     controller = Controller()
     env = environment.FrankaArmEnvironment()
 
-    cameraMoveSpeed = 0.5
+    cameraMoveSpeed = 1
     cameraYaw = 50.0
     cameraPitch = -35.0
     cameraDist = 5.0
@@ -29,9 +29,10 @@ def main():
                                                   # at a time, we use intermediate_pose to save previous manipulated
                                                   # joints that we havent saved as a keyframe yet
 
-    trace = [env.robotGetJointAngles()]    #The trace so far. trace[-1] is the last keyframe added
+    trace = [(env.robotGetEefPosition(),env.robotGetJointAngles())]    #The trace so far. trace[-1] is the last keyframe added
     saveTrace = True
-    snapshot = None
+    rgb = None
+    depth = None
     debounce = False #button debounce, prevents holding button affecting multiple times
     wireframe = False
     p.setDebugObjectColor(env.robotId, current_joint, objectDebugColorRGB=[255,0,0]) #force set so the first time activating wireframe doesnt behave weird
@@ -67,7 +68,7 @@ def main():
             print("saved current as intermediate pose")
 
         if controller.A and not debounce: #save this position as a key frame
-            trace.append(env.robotGetJointAngles())
+            trace.append((env.robotGetEefPosition(),env.robotGetJointAngles()))
             intermediate_pose = env.robotGetJointAngles()
             debounce = True
             print("saved current as keyframe")
@@ -79,7 +80,7 @@ def main():
             print("toggled wireframe " + ("on" if wireframe else "off"))
 
         if controller.DPadDown and not debounce:
-            _, _, snapshot, _, _ = env.robotGetCameraSnapshot()
+            _, _, rgb, depth, _ = env.robotGetCameraSnapshot()
             debounce = True
             print("taken snapshot")
 
@@ -119,7 +120,7 @@ def main():
         with open(path, 'wb') as f:
             pickle.dump(trace, f)
 
-        env.robotSaveCameraSnapshot("trace_snapshot", dir_path, snapshot)
+        env.robotSaveCameraSnapshot("trace_snapshot", dir_path, rgb, depth)
         print("\nSuccessfully saved trace")
     else:
         print("\nQuit without saving trace")
