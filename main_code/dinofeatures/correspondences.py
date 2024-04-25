@@ -12,7 +12,7 @@ from typing import List, Tuple
 from torch import nn
 
 
-def find_correspondences(image_path1: str, image_path2: str, num_pairs: int = 10, load_size: int = 224, layer: int = 9,
+def find_correspondences(image1_tensor: torch.Tensor, image2_tensor: torch.Tensor, extractor: ViTExtractor, num_pairs: int = 10, layer: int = 9,
                          facet: str = 'key', bin: bool = True, thresh: float = 0.05, model_type: str = 'dino_vits8',
                          stride: int = 4, model: nn.Module = None) -> Tuple[List[Tuple[float, float]], List[Tuple[float, float]],
                                                                               Image.Image, Image.Image]:
@@ -33,17 +33,17 @@ def find_correspondences(image_path1: str, image_path2: str, num_pairs: int = 10
     """
     # extracting descriptors for each image
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    extractor = ViTExtractor(model_type, stride, model, device=device)
-    image1_batch, image1_pil = extractor.preprocess(image_path1, load_size)
-    descriptors1 = extractor.extract_descriptors(image1_batch.to(device), layer, facet, bin)
+    #extractor = ViTExtractor(model_type, stride, model, device=device)
+    #image1_batch, image1_pil = extractor.preprocess(image_path1, load_size)
+    descriptors1 = extractor.extract_descriptors(image1_tensor.to(device), layer, facet, bin)
     num_patches1, load_size1 = extractor.num_patches, extractor.load_size
-    image2_batch, image2_pil = extractor.preprocess(image_path2, load_size)
-    descriptors2 = extractor.extract_descriptors(image2_batch.to(device), layer, facet, bin)
+    #image2_batch, image2_pil = extractor.preprocess(image_path2, load_size)
+    descriptors2 = extractor.extract_descriptors(image2_tensor.to(device), layer, facet, bin)
     num_patches2, load_size2 = extractor.num_patches, extractor.load_size
 
     # extracting saliency maps for each image
-    saliency_map1 = extractor.extract_saliency_maps(image1_batch.to(device))[0]
-    saliency_map2 = extractor.extract_saliency_maps(image2_batch.to(device))[0]
+    saliency_map1 = extractor.extract_saliency_maps(image1_tensor.to(device))[0]
+    saliency_map2 = extractor.extract_saliency_maps(image2_tensor.to(device))[0]
     # threshold saliency maps to get fg / bg masks
     fg_mask1 = saliency_map1 > thresh
     fg_mask2 = saliency_map2 > thresh
@@ -108,7 +108,7 @@ def find_correspondences(image_path1: str, image_path2: str, num_pairs: int = 10
         y2_show = (int(y2) - 1) * extractor.stride[0] + extractor.stride[0] + extractor.p // 2
         points1.append((y1_show, x1_show))
         points2.append((y2_show, x2_show))
-    return points1, points2, image1_pil, image2_pil
+    return points1, points2
 
 
 def draw_correspondences(points1: List[Tuple[float, float]], points2: List[Tuple[float, float]],

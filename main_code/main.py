@@ -8,6 +8,7 @@ import glob
 import os
 from dinofeatures.correspondences import find_correspondences, draw_correspondences
 import matplotlib.pyplot as plt
+import dinofeatures.extractor as extractor
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -22,24 +23,7 @@ model_type='dino_vits8' #vitb8
 stride=4
 ERR_THRESHOLD = 50 #generic error between the two sets of points
 
-#Download and load DINO
-dino = torch.hub.load('facebookresearch/dino:main', model_type)
 
-#Create an image transform pipeline
-image_transforms = T.Compose([
-    T.Resize(256, interpolation=T.InterpolationMode.BICUBIC),
-    T.CenterCrop(224),
-    T.ToTensor(),
-    T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-])
-
-
-def embedImage(path):
-    img = Image.open(path)
-    img = image_transforms(img)
-    img = img.unsqueeze(0)
-    emb = dino(img)
-    return emb
 
 
 def loadEmbeddings():
@@ -97,22 +81,27 @@ def compute_error(points1, points2):
 
 
 
-#Robot arm environment
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+print(f"Device: {device}")
+torch.cuda.empty_cache()
+
 env = environment.FrankaArmEnvironment()
+ext = extractor.ViTExtractor(model_type, stride, device=device)
 
 #Save current image, find most similar demo image
-env.robotSaveCameraSnapshot("initial_scene", dir_path + "\\temp")
-initial_emb = embedImage(dir_path + "\\temp\\initial_scene-rgb.jpg")
+#env.robotSaveCameraSnapshot("initial_scene", dir_path + "\\temp")
+#init_tensor = extractor.preprocess(dir_path + "\\temp\\initial_scene-rgb.jpg")
 
-emb1 = dir_path + "\\temp\\mouse.jpg"
-emb2 = dir_path + "\\temp\\rat.jpg"
+emb1, img1 = ext.preprocess(dir_path + "\\temp\\mouse.jpg", load_size)
+emb2, img2 = ext.preprocess(dir_path + "\\temp\\rat.jpg", load_size)
 print("before")
-points1, points2, image1_pil, image2_pil = find_correspondences(emb1, emb2, num_pairs, load_size, layer, facet, bin, thresh, model_type, stride, dino)
+points1, points2 = find_correspondences(emb1, emb2, ext, num_pairs, layer, facet, bin, thresh, model_type, stride)
 print(points1, points2)
-fig1, fig2 = draw_correspondences(points1, points2, image1_pil, image2_pil)
+fig1, fig2 = draw_correspondences(points1, points2, img1, img2)
 fig1.savefig(dir_path + "\\fig1.png", bbox_inches='tight', pad_inches=0)
 fig2.savefig(dir_path + "\\fig2.png", bbox_inches='tight', pad_inches=0)
 print("HELP!")
+exit()
 
 img_embeddings = loadEmbeddings()
 cos_sim = torch.nn.CosineSimilarity(dim=1, eps=1e-08)
@@ -135,7 +124,7 @@ while error > ERR_THRESHOLD:
     depth_live_path = dir_path + f"\\temp\\live-depth.jpg"
 
     with torch.no_grad():
-        points1, points2, image1_pil, image2_pil = find_correspondences(rgb_live_path, rgb_bn_path, num_pairs, load_size, layer,
+        points1, points2, image1_pil, image2_pil = find_correspondences(rgb_live_path, rgb_bn_path, ext, num_pairs, layer,
                                                                             facet, bin, thresh, model_type, stride, dino)
         #Given the pixel coordinates of the correspondences, add the depth channel
         points1 = add_depth(points1, depth_bn_path)
