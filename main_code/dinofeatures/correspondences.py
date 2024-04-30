@@ -48,8 +48,16 @@ def find_correspondences(image1_tensor: torch.Tensor, image2_tensor: torch.Tenso
     fg_mask1 = saliency_map1 > thresh
     fg_mask2 = saliency_map2 > thresh
 
+    print("emptying cache")
+
+    torch.cuda.empty_cache()
+
+    print("cosine sims")
+
     # calculate similarity between image1 and image2 descriptors
     similarities = chunk_cosine_sim(descriptors1, descriptors2)
+
+    print("done cosines")
 
     # calculate best buddies
     image_idxs = torch.arange(num_patches1[0] * num_patches1[1], device=device)
@@ -159,10 +167,11 @@ def chunk_cosine_sim(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     is the number of tokens in y.
     :return: cosine similarity between all descriptors in x and all descriptors in y. Has shape of Bx1x(t_x)x(t_y) """
     result_list = []
+    cos_sim = torch.nn.CosineSimilarity(dim=3, eps=1e-08)
     num_token_x = x.shape[2]
     for token_idx in range(num_token_x):
         token = x[:, :, token_idx, :].unsqueeze(dim=2)  # Bx1x1xd'
-        result_list.append(torch.nn.CosineSimilarity(dim=3)(token, y))  # Bx1xt
+        result_list.append(cos_sim(token, y))  # Bx1xt
     return torch.stack(result_list, dim=2)  # Bx1x(t_x)x(t_y)
 
 

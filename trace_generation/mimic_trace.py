@@ -2,13 +2,14 @@ import environment
 import pickle
 import os
 
-env = environment.FrankaArmEnvironment()
+dir_path = os.path.dirname(os.path.abspath(__file__))
 
-path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "trace.pkl")
-with open(path, 'rb') as f:
+env = environment.FrankaArmEnvironment(videoLogging=False, out_dir=os.path.join(dir_path, "out"))
+
+with open(os.path.join(dir_path, "trace.pkl"), 'rb') as f:
     trace = pickle.load(f)
 
-eefMode = False # True, set robot angles, False set root eef by inverse kinematics
+eefMode = False # True, set robot angles, False set robot eef by inverse kinematics
 
 for keyFrame in range(len(trace)):
     if eefMode:

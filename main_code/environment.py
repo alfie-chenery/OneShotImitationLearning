@@ -2,22 +2,39 @@ import pybullet as p
 import pybullet_data
 import numpy as np
 import time
+import datetime
 from quat_utils import quaternion_from_matrix
 from PIL import Image
+import glob
+import os
+import ffmpeg
 
     
 
 class FrankaArmEnvironment:
 
-    def __init__(self):
+    def __init__(self, videoLogging, out_dir=None):
         p.connect(p.GUI)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
+        p.setRealTimeSimulation(0)
         p.setGravity(0, 0, -10)
-        self.startEnv()
 
+        self.loggerId = p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, out_dir)
 
-    def startEnv(self):
+        self.startEnv(videoLogging, out_dir)
+        
+
+    def startEnv(self, videoLogging, out_dir=None):
         #set object variables
+
+        self.videoLogging = videoLogging
+        self.out_dir = out_dir
+        if out_dir is None:
+            self.videoLogging = False
+        self.frame_counter = 0
+        if self.videoLogging:
+            os.mkdir(out_dir + "\\frames")
+
         self.planeId = p.loadURDF("plane.urdf")
         self.robotId = p.loadURDF("franka_panda/panda.urdf", [0,0,0], [0,0,0,1], useFixedBase=True)
         self.tableId = p.loadURDF("table/table.urdf", [0.6,0,-0.2], p.getQuaternionFromEuler([0,0,np.pi/2]))
@@ -54,12 +71,29 @@ class FrankaArmEnvironment:
 
     def stepEnv(self):
         p.stepSimulation()
+
+        if self.videoLogging:
+            width, height = 1000, 1000
+            _, _, rgbPixels, _, _ = p.getCameraImage(width, height) #, renderer=p.ER_BULLET_HARDWARE_OPENGL)
+            rgb = np.array(rgbPixels).reshape((width, height, 4)).astype(np.uint8)
+            img = Image.fromarray(rgb)
+            img = img.convert("RGB") #RGB, no alpha channel
+            img.save(f"{self.out_dir}\\frames\\frame-{self.frame_counter}.jpg")
+        
         time.sleep(1./240.)
 
 
     def closeEnv(self):
-        #save relevant stuff
+        p.stopStateLogging(self.loggerId)
         p.disconnect()
+
+        if self.videoLogging:
+            fname = datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + ".mp4"
+            ffmpeg.input(self.out_dir + "\\frames\\*.jpg", pattern_type="glob", framerate=30).output(fname).run()
+
+            files = glob.glob(self.out_dir + "\\frames\\*.jpg")
+            for f in files:
+                os.remove(f)
 
 
     def robotGetJointAngles(self):
@@ -172,8 +206,6 @@ class FrankaArmEnvironment:
         """
         if (rgb is None) or (depthBuffer is None):
             _, _, rgb, depthBuffer, _ = self.robotGetCameraSnapshot()
-        
-        #timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
         rgbImg = Image.fromarray(rgb)
         rgbImg = rgbImg.convert("RGB") #RGB, no alpha channel
