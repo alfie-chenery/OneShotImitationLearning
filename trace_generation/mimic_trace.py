@@ -4,7 +4,7 @@ import os
 
 dir_path = os.path.dirname(os.path.abspath(__file__))
 
-env = environment.FrankaArmEnvironment(videoLogging=False, out_dir=os.path.join(dir_path, "out"))
+env = environment.FrankaArmEnvironment(videoLogging=True, out_dir=os.path.join(dir_path, "out"))
 
 with open(os.path.join(dir_path, "trace.pkl"), 'rb') as f:
     trace = pickle.load(f)

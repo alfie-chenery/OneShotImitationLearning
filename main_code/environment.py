@@ -5,10 +5,6 @@ import time
 import datetime
 from quat_utils import quaternion_from_matrix
 from PIL import Image
-import glob
-import os
-import ffmpeg
-
     
 
 class FrankaArmEnvironment:
@@ -19,21 +15,16 @@ class FrankaArmEnvironment:
         p.setRealTimeSimulation(0)
         p.setGravity(0, 0, -10)
 
-        self.loggerId = p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, out_dir)
+        self.videoLogging = videoLogging and out_dir is not None
+        if self.videoLogging:
+            self.loggerId = p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, out_dir + "\\log.mp4")
+            #TODO name log based on datetime 
 
-        self.startEnv(videoLogging, out_dir)
+        self.startEnv()
         
 
-    def startEnv(self, videoLogging, out_dir=None):
+    def startEnv(self):
         #set object variables
-
-        self.videoLogging = videoLogging
-        self.out_dir = out_dir
-        if out_dir is None:
-            self.videoLogging = False
-        self.frame_counter = 0
-        if self.videoLogging:
-            os.mkdir(out_dir + "\\frames")
 
         self.planeId = p.loadURDF("plane.urdf")
         self.robotId = p.loadURDF("franka_panda/panda.urdf", [0,0,0], [0,0,0,1], useFixedBase=True)
@@ -70,30 +61,15 @@ class FrankaArmEnvironment:
 
 
     def stepEnv(self):
-        p.stepSimulation()
-
-        if self.videoLogging:
-            width, height = 1000, 1000
-            _, _, rgbPixels, _, _ = p.getCameraImage(width, height) #, renderer=p.ER_BULLET_HARDWARE_OPENGL)
-            rgb = np.array(rgbPixels).reshape((width, height, 4)).astype(np.uint8)
-            img = Image.fromarray(rgb)
-            img = img.convert("RGB") #RGB, no alpha channel
-            img.save(f"{self.out_dir}\\frames\\frame-{self.frame_counter}.jpg")
-        
+        p.stepSimulation()        
         time.sleep(1./240.)
 
 
     def closeEnv(self):
-        p.stopStateLogging(self.loggerId)
-        p.disconnect()
-
         if self.videoLogging:
-            fname = datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + ".mp4"
-            ffmpeg.input(self.out_dir + "\\frames\\*.jpg", pattern_type="glob", framerate=30).output(fname).run()
+            p.stopStateLogging(self.loggerId)
 
-            files = glob.glob(self.out_dir + "\\frames\\*.jpg")
-            for f in files:
-                os.remove(f)
+        p.disconnect()
 
 
     def robotGetJointAngles(self):
