@@ -2,23 +2,23 @@ import pybullet as p
 import pybullet_data
 import numpy as np
 import time
-import datetime
+from datetime import datetime
 from quat_utils import quaternion_from_matrix
 from PIL import Image
     
 
 class FrankaArmEnvironment:
 
-    def __init__(self, videoLogging, out_dir=None):
+    def __init__(self, videoLogging=False, out_dir=None):
         p.connect(p.GUI)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.setRealTimeSimulation(0)
         p.setGravity(0, 0, -10)
 
-        self.videoLogging = videoLogging and out_dir is not None
+        self.videoLogging = videoLogging and (out_dir is not None)
         if self.videoLogging:
-            self.loggerId = p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, out_dir + "\\log.mp4")
-            #TODO name log based on datetime 
+            timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+            self.loggerId = p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, out_dir + f"\\videolog-{timestamp}.mp4")
 
         self.startEnv()
         
