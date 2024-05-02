@@ -6,9 +6,10 @@ from PIL import Image
 import pickle
 import glob
 import os
-from dinofeatures.correspondences import find_correspondences, draw_correspondences
+#from dinofeatures.correspondences import find_correspondences, draw_correspondences
 import matplotlib.pyplot as plt
-import dinofeatures.extractor as extractor
+#import dinofeatures.extractor as extractor
+from dinovitfeatures import correspondences
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -19,7 +20,7 @@ layer = 9
 facet = 'key'
 bin=True
 thresh=0.05
-model_type='dino_vits8' #vitb8
+model_type='dino_vits16' #vitb8
 stride=4
 ERR_THRESHOLD = 50 #generic error between the two sets of points
 
@@ -86,18 +87,18 @@ print(f"Device: {device}")
 torch.cuda.empty_cache()
 
 env = environment.FrankaArmEnvironment()
-ext = extractor.ViTExtractor(model_type, stride, device=device)
+#ext = extractor.ViTExtractor(model_type, stride, device=device)
 
 #Save current image, find most similar demo image
 #env.robotSaveCameraSnapshot("initial_scene", dir_path + "\\temp")
 #init_tensor = extractor.preprocess(dir_path + "\\temp\\initial_scene-rgb.jpg")
 
-emb1, img1 = ext.preprocess(dir_path + "\\temp\\mouse.jpg", load_size)
-emb2, img2 = ext.preprocess(dir_path + "\\temp\\rat.jpg", load_size)
+#emb1, img1 = ext.preprocess(dir_path + "\\temp\\mouse.jpg", load_size)
+#emb2, img2 = ext.preprocess(dir_path + "\\temp\\rat.jpg", load_size)
 print("before")
-points1, points2 = find_correspondences(emb1, emb2, ext, num_pairs, layer, facet, bin, thresh, model_type, stride)
+points1, points2, img1, img2 = correspondences.find_correspondences(dir_path + "\\temp\\mouse.jpg", dir_path + "\\temp\\rat.jpg", num_pairs, load_size, layer, facet, bin, thresh, model_type, stride)
 print(points1, points2)
-fig1, fig2 = draw_correspondences(points1, points2, img1, img2)
+fig1, fig2 = correspondences.draw_correspondences(points1, points2, img1, img2)
 fig1.savefig(dir_path + "\\fig1.png", bbox_inches='tight', pad_inches=0)
 fig2.savefig(dir_path + "\\fig2.png", bbox_inches='tight', pad_inches=0)
 print("HELP!")

@@ -14,8 +14,7 @@ from torch import nn
 
 def find_correspondences(image1_tensor: torch.Tensor, image2_tensor: torch.Tensor, extractor: ViTExtractor, num_pairs: int = 10, layer: int = 9,
                          facet: str = 'key', bin: bool = True, thresh: float = 0.05, model_type: str = 'dino_vits8',
-                         stride: int = 4, model: nn.Module = None) -> Tuple[List[Tuple[float, float]], List[Tuple[float, float]],
-                                                                              Image.Image, Image.Image]:
+                         stride: int = 4, model: nn.Module = None) -> Tuple[List[Tuple[float, float]], List[Tuple[float, float]]]:
     """
     finding point correspondences between two images.
     :param image_path1: path to the first image.
