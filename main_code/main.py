@@ -3,29 +3,31 @@ import torch
 import numpy as np 
 import torchvision.transforms as T
 from PIL import Image
+import cv2
 import pickle
 import glob
 import os
-#from dinofeatures.correspondences import find_correspondences, draw_correspondences
 import matplotlib.pyplot as plt
-#import dinofeatures.extractor as extractor
-from dinovitfeatures import correspondences
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
-#Hyperparameters for DINO correspondences extraction
-num_pairs = 8
-load_size = 224
-layer = 9
-facet = 'key'
-bin=True
-thresh=0.05
-model_type='dino_vits16' #vitb8
-stride=4
-ERR_THRESHOLD = 50 #generic error between the two sets of points
 
+dino = torch.hub.load('facebookresearch/dino:main', 'dino_vitb8')
 
+image_transforms = T.Compose([
+    T.Resize(256, interpolation=T.InterpolationMode.BICUBIC),
+    T.CenterCrop(224),
+    T.ToTensor(),
+    T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+])
 
+def embedImage(path):
+    print(path)
+    img = Image.open(path)
+    img = image_transforms(img)
+    img = img.unsqueeze(0)
+    emb = dino(img)
+    return emb
 
 def loadEmbeddings():
     """
@@ -36,12 +38,11 @@ def loadEmbeddings():
     i = 0
     for path in glob.glob(dir_path + "\\demonstrations\\*-rgb.jpg"):
         try:
-            name = path.split("\\")[-1].split(".")[0]
-            emb = embedImage(path)
-            embeddings[name] = emb
+            embeddings[path.split("\\")[-1].split("-")[0]] = embedImage(path)
+            #path name shouldnt have a - in it (apart from the one at the end) otherwise itll break. maybe fix that
             i += 1
         except:
-            print("An error occured with one of the images")
+            print(f"An error occured with image {path}")
 
     print(f"Successfully loaded {i} images")
     return embeddings
@@ -67,12 +68,11 @@ def find_transformation(X, Y):
 
 
 def add_depth(points, depth_path):
-    #probably calculate actual depth from buffer here using env.calculateDepthFromBuffer()
+    #TODO can i do this with cv2 and then not need PIL as a dependency???
     depthImg = Image.open(depth_path)
     depth = env.calculateDepthFromBuffer(np.array(depthImg))
-
-    return [(y,x, depth[y,x]) for (y,x) in points]
-    #also check that the points are of the form (y,x) it seems like it but test
+    print(depth.shape)
+    return [(x,y, depth[y,x]) for (x,y) in points]
 
 
 def compute_error(points1, points2):
@@ -84,53 +84,62 @@ def compute_error(points1, points2):
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f"Device: {device}")
-torch.cuda.empty_cache()
-
 env = environment.FrankaArmEnvironment()
-#ext = extractor.ViTExtractor(model_type, stride, device=device)
 
-#Save current image, find most similar demo image
-#env.robotSaveCameraSnapshot("initial_scene", dir_path + "\\temp")
-#init_tensor = extractor.preprocess(dir_path + "\\temp\\initial_scene-rgb.jpg")
+orb = cv2.ORB_create(10000, fastThreshold=0)
+matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
 
-#emb1, img1 = ext.preprocess(dir_path + "\\temp\\mouse.jpg", load_size)
-#emb2, img2 = ext.preprocess(dir_path + "\\temp\\rat.jpg", load_size)
-print("before")
-points1, points2, img1, img2 = correspondences.find_correspondences(dir_path + "\\temp\\mouse.jpg", dir_path + "\\temp\\rat.jpg", num_pairs, load_size, layer, facet, bin, thresh, model_type, stride)
-print(points1, points2)
-fig1, fig2 = correspondences.draw_correspondences(points1, points2, img1, img2)
-fig1.savefig(dir_path + "\\fig1.png", bbox_inches='tight', pad_inches=0)
-fig2.savefig(dir_path + "\\fig2.png", bbox_inches='tight', pad_inches=0)
-print("HELP!")
-exit()
+path_live_rgb = dir_path + f"\\temp\\live-rgb.jpg"
+path_live_depth = dir_path + f"\\temp\\live-depth.jpg"
 
-img_embeddings = loadEmbeddings()
+#take initial screenshot
+env.robotSaveCameraSnapshot("live", dir_path + "\\temp")
+init_emb = embedImage(path_live_rgb)
+
+demo_img_emb = loadEmbeddings()
 cos_sim = torch.nn.CosineSimilarity(dim=1, eps=1e-08)
 best = (-1, None)
-
-for key in img_embeddings.keys():
-    sim = cos_sim(initial_emb, img_embeddings[key])
+for key in demo_img_emb.keys():
+    sim = cos_sim(init_emb, demo_img_emb[key])
     if sim > best[0]:
         best = (sim, key)
 
 #load bottleneck image
-rgb_bn_path = dir_path + f"\\demonstrations\\{best[1]}-rgb.jpg"
-depth_bn_path = dir_path + f"\\demonstrations\\{best[1]}-depth.jpg"
+path_init_rgb = dir_path + f"\\demonstrations\\{best[1]}-rgb.jpg"
+path_init_depth = dir_path + f"\\demonstrations\\{best[1]}-depth.jpg"
 
-error = 100000
+img_init_rgb = cv2.imread(path_init_rgb, cv2.IMREAD_GRAYSCALE)
+kp_init, des_init = orb.detectAndCompute(img_init_rgb, None)
+
+
+ERR_THRESHOLD = 50 #generic error between the two sets of points
+error = ERR_THRESHOLD + 1
 while error > ERR_THRESHOLD:
     #save live image to temp folder
     env.robotSaveCameraSnapshot("live", dir_path + "\\temp")
-    rgb_live_path = dir_path + f"\\temp\\live-rgb.jpg"
-    depth_live_path = dir_path + f"\\temp\\live-depth.jpg"
 
-    with torch.no_grad():
-        points1, points2, image1_pil, image2_pil = find_correspondences(rgb_live_path, rgb_bn_path, ext, num_pairs, layer,
-                                                                            facet, bin, thresh, model_type, stride, dino)
+    with torch.no_grad(): #TODO: is this still needed?
+        
+        img_live_rgb = cv2.imread(path_live_rgb, cv2.IMREAD_GRAYSCALE)
+        kp_live, des_live = orb.detectAndCompute(img_live_rgb, None)
+        # Brute force greedy match keypoints based on descriptors, as a first guess
+        matches = matcher.match(des_live, des_init)
+        # GMS (Grid-based Motion Statistics) algorithm refines the guess for high quality matches
+        matches_gms = cv2.xfeatures2d.matchGMS(img_live_rgb.shape, img_init_rgb.shape, kp_live, kp_init, matches, withRotation=True, withScale=True)
+
+        #Extract matching coordinates
+        U, V = [], []
+        for match in matches_gms:
+            x, y = kp_live[match.queryIdx].pt
+            U.append( (int(x), int(y)) )
+
+            x, y = kp_live[match.trainIdx].pt
+            V.append( (int(x), int(y)) )
+
         #Given the pixel coordinates of the correspondences, add the depth channel
-        points1 = add_depth(points1, depth_bn_path)
-        points2 = add_depth(points2, depth_live_path)
-        R, t = find_transformation(points1, points2)
+        U = add_depth(U, path_init_depth)
+        V = add_depth(V, path_live_depth)
+        R, t = find_transformation(U, V)
 
         #A function to convert pixel distance into meters based on calibration of camera.
         t_meters = t * 0.001
@@ -138,4 +147,4 @@ while error > ERR_THRESHOLD:
 
         #Move robot
         env.robotMoveEefPosition(t_meters,R)
-        error = compute_error(points1, points2) #probs just use euclidian distance?
+        error = compute_error(U, V) #probs just use euclidian distance?
