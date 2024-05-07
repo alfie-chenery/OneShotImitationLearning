@@ -71,14 +71,21 @@ def add_depth(points, depth_path):
     #TODO can i do this with cv2 and then not need PIL as a dependency???
     depthImg = Image.open(depth_path)
     depth = env.calculateDepthFromBuffer(np.array(depthImg))
-    print(depth.shape)
     return [(x,y, depth[y,x]) for (x,y) in points]
 
 
 def compute_error(points1, points2):
+    print(points1[:5])
+    print(points2[:5])
+    #testing, delete this, the points sholdnt be identical but they are.
+    # I think an artefact of the exact images, because the cup is kind of out of view, the keypoints
+    # all care about the table, which hasnt moved so no error in keypoints
+    
     np1 = np.array(points1)
     np2 = np.array(points2)
-    return np.linalg.norm(np1 - np2)
+
+    distances = np.linalg.norm(np1 - np2, axis=1)
+    return np.sum(distances)
 
 
 
@@ -128,18 +135,18 @@ while error > ERR_THRESHOLD:
         matches_gms = cv2.xfeatures2d.matchGMS(img_live_rgb.shape, img_init_rgb.shape, kp_live, kp_init, matches, withRotation=True, withScale=True)
 
         #Extract matching coordinates
-        U, V = [], []
-        for match in matches_gms:
-            x, y = kp_live[match.queryIdx].pt
-            U.append( (int(x), int(y)) )
+        points_live, points_init = [], []
+        for m in matches_gms:
+            x, y = kp_live[m.queryIdx].pt
+            points_live.append( (int(x), int(y)) )
 
-            x, y = kp_live[match.trainIdx].pt
-            V.append( (int(x), int(y)) )
+            u, v = kp_init[m.trainIdx].pt
+            points_init.append( (int(u), int(v)) )
 
         #Given the pixel coordinates of the correspondences, add the depth channel
-        U = add_depth(U, path_init_depth)
-        V = add_depth(V, path_live_depth)
-        R, t = find_transformation(U, V)
+        points_live = add_depth(points_live, path_live_depth)
+        points_init = add_depth(points_init, path_init_depth)
+        R, t = find_transformation(points_live, points_init)
 
         #A function to convert pixel distance into meters based on calibration of camera.
         t_meters = t * 0.001
@@ -147,4 +154,5 @@ while error > ERR_THRESHOLD:
 
         #Move robot
         env.robotMoveEefPosition(t_meters,R)
-        error = compute_error(U, V) #probs just use euclidian distance?
+        error = compute_error(points_live, points_init)
+        print(error)

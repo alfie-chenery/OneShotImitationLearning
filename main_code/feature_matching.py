@@ -224,7 +224,7 @@ def main(img1_path, img2_path, method, numMatches=None):
 if __name__ == "__main__":
     dir_path = dir_path = os.path.dirname(os.path.realpath(__file__))
     img1_path = dir_path + "\\temp\\live-rgb.jpg"
-    img2_path = dir_path + "\\temp\\initial_scene-rgb.jpg"
+    img2_path = dir_path + "\\demonstrations\\demo0-rgb.jpg"
 
     main(img1_path, img2_path, "ORB_GMS", numMatches=None)
     
