@@ -177,13 +177,13 @@ with open(dir_path + f"\\demonstrations\\{best[1]}.pkl", 'rb') as f:
 # but actually we only need to add the difference between the final alligned pos and the rest pos we started at.
 # so we need to so like demo + aligned - rest which is fine for pos but how do you do that for orn???
 start_pos, start_orn = env.robotGetEefPosition()
-offset_pos = np.array(start_pos) - np.array(env.restPos)
-offset_orn = 0 #TODO
+offset_pos = (np.array(start_pos) - np.array(env.restPos)).tolist()
+offset_orn = env.interpolateQuaternion(env.restOrn, start_orn)
 
 for keyFrame in range(len(trace)):
     demo_pos, demo_orn = trace[keyFrame][0]
 
-    desired_pos, desired_orn = env.offsetMovement(demo_pos, demo_orn, offset_pos.tolist(), offset_orn)
+    desired_pos, desired_orn = env.offsetMovement(demo_pos, demo_orn, offset_pos, offset_orn)
 
     env.robotSetEefPosition(desired_pos, desired_orn)
 #---

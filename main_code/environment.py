@@ -136,6 +136,9 @@ class FrankaArmEnvironment:
 
     def offsetMovement(self, pos, orn, dPos, dOrn):
         return p.multiplyTransforms(pos, orn, dPos, dOrn)
+    
+    def interpolateQuaternion(self, a, b):
+        return p.getDifferenceQuaternion(a, b)
 
 
     def robotGetCameraSnapshot(self):
