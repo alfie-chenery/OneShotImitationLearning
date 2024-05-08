@@ -8,6 +8,7 @@ import pickle
 import glob
 import os
 import matplotlib.pyplot as plt
+import time
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -74,13 +75,7 @@ def add_depth(points, depth_path):
     return [(x,y, depth[y,x]) for (x,y) in points]
 
 
-def compute_error(points1, points2):
-    print(points1[:5])
-    print(points2[:5])
-    #testing, delete this, the points sholdnt be identical but they are.
-    # I think an artefact of the exact images, because the cup is kind of out of view, the keypoints
-    # all care about the table, which hasnt moved so no error in keypoints
-    
+def compute_error(points1, points2):    
     np1 = np.array(points1)
     np2 = np.array(points2)
 
@@ -93,8 +88,8 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f"Device: {device}")
 env = environment.FrankaArmEnvironment()
 
-orb = cv2.ORB_create(10000, fastThreshold=0)
-matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+keypointExtracter = cv2.ORB_create()#10000, fastThreshold=0)
+keypointMatcher = cv2.BFMatcher()#cv2.NORM_HAMMING, crossCheck=True)
 
 path_live_rgb = dir_path + f"\\temp\\live-rgb.jpg"
 path_live_depth = dir_path + f"\\temp\\live-depth.jpg"
@@ -116,37 +111,52 @@ path_init_rgb = dir_path + f"\\demonstrations\\{best[1]}-rgb.jpg"
 path_init_depth = dir_path + f"\\demonstrations\\{best[1]}-depth.jpg"
 
 img_init_rgb = cv2.imread(path_init_rgb, cv2.IMREAD_GRAYSCALE)
-kp_init, des_init = orb.detectAndCompute(img_init_rgb, None)
+kp_init, des_init = keypointExtracter.detectAndCompute(img_init_rgb, None)
 
+plt.ion()
+plt.show()
 
 ERR_THRESHOLD = 50 #generic error between the two sets of points
 error = ERR_THRESHOLD + 1
 while error > ERR_THRESHOLD:
+    time.sleep(5)
     #save live image to temp folder
     env.robotSaveCameraSnapshot("live", dir_path + "\\temp")
 
     with torch.no_grad(): #TODO: is this still needed?
         
         img_live_rgb = cv2.imread(path_live_rgb, cv2.IMREAD_GRAYSCALE)
-        kp_live, des_live = orb.detectAndCompute(img_live_rgb, None)
+        kp_live, des_live = keypointExtracter.detectAndCompute(img_live_rgb, None)
         # Brute force greedy match keypoints based on descriptors, as a first guess
-        matches = matcher.match(des_live, des_init)
+        matches = keypointMatcher.match(des_live, des_init)
+        matches = sorted(matches, key = lambda x:x.distance)
+        matches = matches[:10]
         # GMS (Grid-based Motion Statistics) algorithm refines the guess for high quality matches
-        matches_gms = cv2.xfeatures2d.matchGMS(img_live_rgb.shape, img_init_rgb.shape, kp_live, kp_init, matches, withRotation=True, withScale=True)
+        #matches_gms = cv2.xfeatures2d.matchGMS(img_live_rgb.shape, img_init_rgb.shape, kp_live, kp_init, matches, withRotation=True, withScale=True)
+
+        matchImg = cv2.drawMatches(img_live_rgb,kp_live,img_init_rgb,kp_init,matches,None,flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+        plt.imshow(matchImg)
+        plt.pause(0.1)
 
         #Extract matching coordinates
         points_live, points_init = [], []
-        for m in matches_gms:
+        for m in matches:
             x, y = kp_live[m.queryIdx].pt
             points_live.append( (int(x), int(y)) )
 
             u, v = kp_init[m.trainIdx].pt
             points_init.append( (int(u), int(v)) )
 
+        if len(points_live) == 0 or len(points_init) == 0:
+            raise Exception("No keypoints found. This is a big problem!")
+
         #Given the pixel coordinates of the correspondences, add the depth channel
         points_live = add_depth(points_live, path_live_depth)
         points_init = add_depth(points_init, path_init_depth)
         R, t = find_transformation(points_live, points_init)
+
+        print(R)
+        print(t)
 
         #A function to convert pixel distance into meters based on calibration of camera.
         t_meters = t * 0.001
@@ -156,3 +166,27 @@ while error > ERR_THRESHOLD:
         env.robotMoveEefPosition(t_meters,R)
         error = compute_error(points_live, points_init)
         print(error)
+
+plt.close()
+
+#execute demo
+with open(dir_path + f"\\demonstrations\\{best[1]}.pkl", 'rb') as f:
+    trace = pickle.load(f)
+
+#--- we need to add the alligned eef pos and orn to each keyframe of the trace
+# but actually we only need to add the difference between the final alligned pos and the rest pos we started at.
+# so we need to so like demo + aligned - rest which is fine for pos but how do you do that for orn???
+start_pos, start_orn = env.robotGetEefPosition()
+offset_pos = np.array(start_pos) - np.array(env.restPos)
+offset_orn = 0 #TODO
+
+for keyFrame in range(len(trace)):
+    demo_pos, demo_orn = trace[keyFrame][0]
+
+    desired_pos, desired_orn = env.offsetMovement(demo_pos, demo_orn, offset_pos.tolist(), offset_orn)
+
+    env.robotSetEefPosition(desired_pos, desired_orn)
+#---
+
+while True:
+    env.stepEnv()

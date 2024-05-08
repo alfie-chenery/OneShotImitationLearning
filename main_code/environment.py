@@ -3,7 +3,7 @@ import pybullet_data
 import numpy as np
 import time
 from datetime import datetime
-from quat_utils import quaternion_from_matrix
+from scipy.spatial.transform import Rotation
 from PIL import Image
     
 
@@ -27,9 +27,10 @@ class FrankaArmEnvironment:
         #set object variables
 
         self.planeId = p.loadURDF("plane.urdf")
-        self.robotId = p.loadURDF("franka_panda/panda.urdf", [0,0,0], [0,0,0,1], useFixedBase=True)
-        self.tableId = p.loadURDF("table/table.urdf", [0.6,0,-0.2], p.getQuaternionFromEuler([0,0,np.pi/2]))
-        self.objectId = p.loadURDF("urdf/mug.urdf", [0.6, 0, 0.5], [0,0,0,1])
+        self.robotId = p.loadURDF("franka_panda/panda.urdf", [0, 0, 0], [0, 0, 0, 1], useFixedBase=True)
+        self.tableId = p.loadURDF("table/table.urdf", [0.6, 0, -0.2], p.getQuaternionFromEuler([0,0,np.pi/2]), useFixedBase=True)
+        self.objectId = p.loadURDF("urdf/mug.urdf", [0.6, 0.01, 0.45], [0, 0, 0, 1])
+        self.debugLineId = -1
 
         self.numJoints = p.getNumJoints(self.robotId)
         self.fixed_joints = [7,8,11] #These joints are fixed and cannot move
@@ -40,6 +41,7 @@ class FrankaArmEnvironment:
         self.upperLimits = []
         self.jointRanges = []
         self.restPoses = [-0.0016406124581102627, 0.026211667016220668, 0.002989846306765971, -0.9495545304254569, -5.895048550690606e-05, 1.2393585715718878, -1.7747677120392198e-05, 0.0, 0.0, -9.177073744494914e-20, 0.00065723506632391, 0.0]
+        self.restPos, self.restOrn = self.robotGetEefPosition()
         for i in range(self.numJoints):
             jointInfo = p.getJointInfo(self.robotId, i)
             self.lowerLimits.append(jointInfo[8])
@@ -61,7 +63,8 @@ class FrankaArmEnvironment:
 
 
     def stepEnv(self):
-        p.stepSimulation()        
+        p.stepSimulation()
+        self.drawDebugLine()
         time.sleep(1./240.)
 
 
@@ -124,15 +127,15 @@ class FrankaArmEnvironment:
 
     def robotMoveEefPosition(self, translation, rotationMatrix):
         pos, orn = self.robotGetEefPosition()
-        posVec = np.array(pos)
-        ornMatrix = np.array(p.getMatrixFromQuaternion(orn)).reshape((3,3))
+        rotation = Rotation.from_matrix(rotationMatrix)
+        rotation = rotation.as_quat()
+        newPos, newOrn = p.multiplyTransforms(pos, orn, translation, rotation.tolist())
 
-        print(f"Rotation: {orn}, {ornMatrix}")
+        self.robotSetEefPosition(newPos, newOrn)
 
-        self.robotSetEefPosition(posVec + translation, quaternion_from_matrix(np.dot(ornMatrix, rotationMatrix)))
-        
-        #find a module to do the matrix to quat for me. ChatGPT solution seems dodgy
-        # removing the need for quat_utils file
+
+    def offsetMovement(self, pos, orn, dPos, dOrn):
+        return p.multiplyTransforms(pos, orn, dPos, dOrn)
 
 
     def robotGetCameraSnapshot(self):
@@ -147,10 +150,6 @@ class FrankaArmEnvironment:
         pos, orn = self.robotGetEefPosition()
         rotationMatrix = np.array(p.getMatrixFromQuaternion(orn)).reshape((3, 3))
 
-        print("Rotation matrix")
-        print(rotationMatrix)
-        print("")
-
         # Initial vectors
         initCameraVector = (0, 0, 1) # z-axis
         initUpVector = (0, 1, 0) # y-axis
@@ -158,10 +157,6 @@ class FrankaArmEnvironment:
         cameraVector = rotationMatrix.dot(initCameraVector)
         upVector = rotationMatrix.dot(initUpVector)
         viewMatrix = p.computeViewMatrix(pos, pos + 0.1 * cameraVector, upVector)
-
-        print("View matrix")
-        print(np.array(viewMatrix).reshape((4,4)))
-        print("")
 
         width, height, rgbPixels, depthPixels, segmentationBuffer = p.getCameraImage(self.imgSize, self.imgSize, viewMatrix, self.projectionMatrix)
         rgb = np.array(rgbPixels).reshape((width, height, 4)).astype(np.uint8)
@@ -205,6 +200,16 @@ class FrankaArmEnvironment:
 
     def setDebugCameraPos(self, cameraDist, cameraYaw, cameraPitch):
         p.resetDebugVisualizerCamera(cameraDist, cameraYaw, cameraPitch, [0,0,0])
+
+    
+    def drawDebugLine(self):
+        start, orn = self.robotGetEefPosition()
+        rotationMatrix = np.array(p.getMatrixFromQuaternion(orn)).reshape((3, 3))
+        initLineVector = (0, 0, 1) # z-axis
+        lineVector = rotationMatrix.dot(initLineVector)
+        stop = start + 0.2 * lineVector
+
+        self.debugLineId = p.addUserDebugLine(start, stop, lineColorRGB=[1,0,0], replaceItemUniqueId=self.debugLineId)
 
 
     def enableWireframe(self):
