@@ -29,12 +29,12 @@ def main():
                                                   # at a time, we use intermediate_pose to save previous manipulated
                                                   # joints that we havent saved as a keyframe yet
 
-    trace = [(env.robotGetEefPosition(),env.robotGetJointAngles())]    #The trace so far. trace[-1] is the last keyframe added
+    trace = [env.robotGetJointAngles()]    #The trace so far. trace[-1] is the last keyframe added
     saveTrace = True
-    rgb = None
-    depth = None
+    _, _, rgb, depth, _ = env.robotGetCameraSnapshot()
     debounce = False #button debounce, prevents holding button affecting multiple times
     wireframe = False
+    gripperClosed = True
     p.setDebugObjectColor(env.robotId, current_joint, objectDebugColorRGB=[255,0,0]) #force set so the first time activating wireframe doesnt behave weird
 
     while True:
@@ -68,7 +68,7 @@ def main():
             print("saved current as intermediate pose")
 
         if controller.A and not debounce: #save this position as a key frame
-            trace.append((env.robotGetEefPosition(),env.robotGetJointAngles()))
+            trace.append(env.robotGetJointAngles())
             intermediate_pose = env.robotGetJointAngles()
             debounce = True
             print("saved current as keyframe")
@@ -84,7 +84,13 @@ def main():
             debounce = True
             print("taken snapshot")
 
-        #eft joystick controls joints
+        if controller.DPadLeft and not debounce:
+            gripperClosed = not gripperClosed
+            env.robotCloseGripper() if gripperClosed else env.robotOpenGripper()
+            debounce = True
+            print(("closed" if gripperClosed else "openned") + " gripper")
+
+        #left joystick controls joints
         joints = env.robotGetJointAngles()
         joints[current_joint] += joystickSensitivity * controller.LeftJoystickY
         env.robotSetJointAngles(joints, interpolationSteps=5)

@@ -9,14 +9,15 @@ env = environment.FrankaArmEnvironment(videoLogging=True, out_dir=os.path.join(d
 with open(os.path.join(dir_path, "trace.pkl"), 'rb') as f:
     trace = pickle.load(f)
 
-eefMode = False # True, set robot angles, False set robot eef by inverse kinematics
+eefMode = True # True, set robot angles, False set robot eef by inverse kinematics
 
 for keyFrame in range(len(trace)):
     if eefMode:
-        desired_pos, desired_orn = trace[keyFrame][0]
+        desired_pos, desired_orn, gripper_closed = trace[keyFrame]
         env.robotSetEefPosition(desired_pos, desired_orn)
+        env.robotCloseGripper() if gripper_closed else env.robotOpenGripper()
     else:
-        desired_angles = trace[keyFrame][1]
+        desired_angles = trace[keyFrame]
         env.robotSetJointAngles(desired_angles)
 
 env.closeEnv()

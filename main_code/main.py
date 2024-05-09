@@ -176,16 +176,19 @@ with open(dir_path + f"\\demonstrations\\{best[1]}.pkl", 'rb') as f:
 #--- we need to add the alligned eef pos and orn to each keyframe of the trace
 # but actually we only need to add the difference between the final alligned pos and the rest pos we started at.
 # so we need to so like demo + aligned - rest which is fine for pos but how do you do that for orn???
-start_pos, start_orn = env.robotGetEefPosition()
-offset_pos = (np.array(start_pos) - np.array(env.restPos)).tolist()
-offset_orn = env.interpolateQuaternion(env.restOrn, start_orn)
+alligned_pos, alligned_orn = env.robotGetEefPosition()
 
 for keyFrame in range(len(trace)):
-    demo_pos, demo_orn = trace[keyFrame][0]
+    demo_pos, demo_orn, demo_gripper = trace[keyFrame]
 
+    offset_pos, offset_orn = env.offsetMovementInverse(alligned_pos, alligned_orn, env.restPos, env.restOrn)
     desired_pos, desired_orn = env.offsetMovement(demo_pos, demo_orn, offset_pos, offset_orn)
 
+    print(offset_pos, offset_orn)
+    print(desired_pos, desired_orn)
+
     env.robotSetEefPosition(desired_pos, desired_orn)
+    env.robotCloseGripper() if demo_gripper else env.robotOpenGripper()
 #---
 
 while True:

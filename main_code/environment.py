@@ -30,7 +30,7 @@ class FrankaArmEnvironment:
         self.robotId = p.loadURDF("franka_panda/panda.urdf", [0, 0, 0], [0, 0, 0, 1], useFixedBase=True)
         self.tableId = p.loadURDF("table/table.urdf", [0.6, 0, -0.2], p.getQuaternionFromEuler([0,0,np.pi/2]), useFixedBase=True)
         self.objectId = p.loadURDF("urdf/mug.urdf", [0.6, 0.01, 0.45], [0, 0, 0, 1])
-        self.debugLineId = -1
+        self.debugLines = [[-1,(1,0,0),[0,1,0]], [-1,(0,1,0),[0,0,1]], [-1,(0,0,1),[1,0,0]]]  #list of [id, vector, colour]
 
         self.numJoints = p.getNumJoints(self.robotId)
         self.fixed_joints = [7,8,11] #These joints are fixed and cannot move
@@ -41,7 +41,6 @@ class FrankaArmEnvironment:
         self.upperLimits = []
         self.jointRanges = []
         self.restPoses = [-0.0016406124581102627, 0.026211667016220668, 0.002989846306765971, -0.9495545304254569, -5.895048550690606e-05, 1.2393585715718878, -1.7747677120392198e-05, 0.0, 0.0, -9.177073744494914e-20, 0.00065723506632391, 0.0]
-        self.restPos, self.restOrn = self.robotGetEefPosition()
         for i in range(self.numJoints):
             jointInfo = p.getJointInfo(self.robotId, i)
             self.lowerLimits.append(jointInfo[8])
@@ -49,7 +48,14 @@ class FrankaArmEnvironment:
             self.jointRanges.append(jointInfo[9] - jointInfo[8])
             
             p.resetJointState(self.robotId, i, self.restPoses[i])
+        self.restPos, self.restOrn = self.robotGetEefPosition()
+
         self.useNullSpace = False
+
+        self.debugCameraYaw = 50.0
+        self.debugCameraPitch = -35.0
+        self.debugCameraDist = 5.0
+        self.debugCameraTarget = [0,0,0]
 
         self.imgSize = 224
         self.fov = 60 #degrees?
@@ -64,7 +70,7 @@ class FrankaArmEnvironment:
 
     def stepEnv(self):
         p.stepSimulation()
-        self.drawDebugLine()
+        self.drawDebugLines()
         time.sleep(1./240.)
 
 
@@ -110,7 +116,7 @@ class FrankaArmEnvironment:
         return pos, orn
 
 
-    def robotSetEefPosition(self, pos, orn=None):
+    def robotSetEefPosition(self, pos, orn=None, interpolationSteps=100):
         if self.useNullSpace:
             jointAngles = list(p.calculateInverseKinematics(self.robotId, self.eefId, pos, orn, self.lowerLimits, self.upperLimits, self.jointRanges, self.restPoses))
         else:
@@ -122,23 +128,54 @@ class FrankaArmEnvironment:
         # but when setting joint angles we expect to set every joint (all 12, even though the fixed ones will be ignored)
         # easiest to add dummy values for these joints before setting angles, they will be ignored anyway
 
-        self.robotSetJointAngles(jointAngles)
+        self.robotSetJointAngles(jointAngles, interpolationSteps=interpolationSteps)
 
 
-    def robotMoveEefPosition(self, translation, rotationMatrix):
+    def robotMoveEefPosition(self, translation, rotationMatrix, interpolationSteps=100):
         pos, orn = self.robotGetEefPosition()
         rotation = Rotation.from_matrix(rotationMatrix)
         rotation = rotation.as_quat()
         newPos, newOrn = p.multiplyTransforms(pos, orn, translation, rotation.tolist())
 
-        self.robotSetEefPosition(newPos, newOrn)
+        self.robotSetEefPosition(newPos, newOrn, interpolationSteps=interpolationSteps)
 
 
     def offsetMovement(self, pos, orn, dPos, dOrn):
+        """
+        'Add' dPos and dOrn as an offset to pos and orn
+        """
         return p.multiplyTransforms(pos, orn, dPos, dOrn)
     
-    def interpolateQuaternion(self, a, b):
-        return p.getDifferenceQuaternion(a, b)
+
+    def offsetMovementInverse(self, pos, orn, dPos, dOrn):
+        """
+        'Subtract' dPos and dOrn as an offset from pos and orn
+        """
+        dPos2, dOrn2 = p.invertTransform(dPos, dOrn)
+        print(dPos, dPos2, dOrn, dOrn2)
+        return p.multiplyTransforms(pos, orn, dPos2, dOrn2)
+    
+
+    def robotCloseGripper(self):
+        """
+        Closes the gripper as far as possible. Does not move other joints
+        Gripper joints are joints id 9 and 10
+        """
+        joints = self.robotGetJointAngles()
+        joints[9] = self.lowerLimits[9]
+        joints[10] = self.lowerLimits[10]
+        self.robotSetJointAngles(joints, interpolationSteps=5)
+
+
+    def robotOpenGripper(self):
+        """
+        Opens the gripper as far as possible. Does not move other joints
+        Gripper joints are joints id 9 and 10
+        """
+        joints = self.robotGetJointAngles()
+        joints[9] = self.upperLimits[9]
+        joints[10] = self.upperLimits[10]
+        self.robotSetJointAngles(joints, interpolationSteps=5)
 
 
     def robotGetCameraSnapshot(self):
@@ -201,26 +238,29 @@ class FrankaArmEnvironment:
         return depth
 
 
-    def setDebugCameraPos(self, cameraDist, cameraYaw, cameraPitch):
-        p.resetDebugVisualizerCamera(cameraDist, cameraYaw, cameraPitch, [0,0,0])
+    def getDebugCameraState(self):
+        _, _, _, _, _, _, _, _, cameraDist, cameraYaw, cameraPitch, cameraTarget = p.getDebugVisualizerCamera()
+        return (cameraDist, cameraYaw, cameraPitch, cameraTarget)
+
+    def setDebugCameraState(self, cameraDist, cameraYaw, cameraPitch, cameraTarget=[0,0,0]):
+        p.resetDebugVisualizerCamera(cameraDist, cameraYaw, cameraPitch, cameraTarget)
 
     
-    def drawDebugLine(self):
+    def drawDebugLines(self):
+        """
+        Draws the lines specified in self.debugLines
+        Each line is of the form [id, vector, colour]
+        where vector is relative to the robots eef and colour is a list [R,G,B] with values 0..1
+        """
         start, orn = self.robotGetEefPosition()
         rotationMatrix = np.array(p.getMatrixFromQuaternion(orn)).reshape((3, 3))
-        initLineVector = (0, 0, 1) # z-axis
-        lineVector = rotationMatrix.dot(initLineVector)
-        stop = start + 0.2 * lineVector
 
-        self.debugLineId = p.addUserDebugLine(start, stop, lineColorRGB=[1,0,0], replaceItemUniqueId=self.debugLineId)
+        for line in self.debugLines:
+            lineVector = rotationMatrix.dot(line[1])
+            stop = start + 0.2 * lineVector
 
+            line[0] = p.addUserDebugLine(start, stop, line[2], replaceItemUniqueId=line[-0])
 
-    def enableWireframe(self):
-        p.configureDebugVisualizer(p.COV_ENABLE_WIREFRAME, 1)
-
-
-    def disableWireframe(self):
-        p.configureDebugVisualizer(p.COV_ENABLE_WIREFRAME, 0)
 
 
 
