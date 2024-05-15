@@ -9,7 +9,7 @@ def main():
     controller = Controller()
     env = environment.FrankaArmEnvironment()
 
-    joystickSensitivity = 0.1 #scalar to slow down how much the joysticks move
+    joystickSensitivity = 0.05 #scalar to slow down how much the joysticks move
     triggerSensitivity = 0.1
 
     gripperClosed = True
@@ -48,10 +48,11 @@ def main():
             print("taken snapshot")
 
         if controller.DPadLeft and not debounce:
-            gripperClosed = not gripperClosed
-            env.robotCloseGripper() if gripperClosed else env.robotOpenGripper()
-            debounce = True
-            print(("closed" if gripperClosed else "openned") + " gripper")
+            if not cameraMode:
+                gripperClosed = not gripperClosed
+                env.robotCloseGripper() if gripperClosed else env.robotOpenGripper()
+                debounce = True
+                print(("closed" if gripperClosed else "openned") + " gripper")
 
         if controller.DPadRight and not debounce:
             cameraMode = not cameraMode
@@ -60,11 +61,14 @@ def main():
 
         
         if cameraMode:
-            cameraYaw, cameraPitch, cameraDist, _ = env.getDebugCameraState()
+            cameraYaw, cameraPitch, cameraDist, cameraTarget = env.getDebugCameraState()
             cameraYaw += joystickSensitivity * controller.RightJoystickX
             cameraPitch += joystickSensitivity * controller.RightJoystickY
             cameraDist += triggerSensitivity * 0.1 * (controller.LeftBumper - controller.RightBumper)
-            env.setDebugCameraState(cameraDist, cameraYaw, cameraPitch)
+            cameraTarget = list(cameraTarget)
+            cameraTarget[0] += joystickSensitivity * controller.LeftJoystickX
+            cameraTarget[1] += joystickSensitivity * controller.LeftJoystickY
+            env.setDebugCameraState(cameraDist, cameraYaw, cameraPitch, cameraTarget)
 
         else:
             dPos = [joystickSensitivity * controller.LeftJoystickX, 

@@ -41,13 +41,13 @@ def main():
 
         if controller.LeftBumper and not debounce: #move to previous joint
             p.setDebugObjectColor(env.robotId, current_joint) #no colour resets to default
-            current_joint = Clamp(current_joint - 1, 0, env.numJoints - 1)
+            current_joint = Clamp(current_joint - 1, 0, env.numControlledJoints - 1)
             p.setDebugObjectColor(env.robotId, current_joint, objectDebugColorRGB=[255,0,0])
             debounce = True
             
         if controller.RightBumper and not debounce: #move to next joint
             p.setDebugObjectColor(env.robotId, current_joint) #no colour resets to default
-            current_joint = Clamp(current_joint + 1, 0, env.numJoints - 1)
+            current_joint = Clamp(current_joint + 1, 0, env.numControlledJoints - 1)
             p.setDebugObjectColor(env.robotId, current_joint, objectDebugColorRGB=[255,0,0])
             debounce = True
             

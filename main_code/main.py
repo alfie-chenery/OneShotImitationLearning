@@ -72,7 +72,8 @@ def add_depth(points, depth_path):
     #TODO can i do this with cv2 and then not need PIL as a dependency???
     depthImg = Image.open(depth_path)
     depth = env.calculateDepthFromBuffer(np.array(depthImg))
-    return [(x,y, depth[y,x]) for (x,y) in points]
+    return [(x,y, depth[int(y),int(x)]) for (x,y) in points]
+    #TODO consider interpolating the pixels around (y,x) rather than just rounding to nearest int
 
 
 def compute_error(points1, points2):    
@@ -80,16 +81,23 @@ def compute_error(points1, points2):
     np2 = np.array(points2)
 
     distances = np.linalg.norm(np1 - np2, axis=1)
-    return np.sum(distances)
+    return np.mean(distances)
+    #We cant be certain how many keypoint matches we get from the GMS matching. Therefore,
+    # to be fair we should normalise by the number of matches. Ie mean instead of sum
 
 
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f"Device: {device}")
-env = environment.FrankaArmEnvironment()
 
-keypointExtracter = cv2.ORB_create()#10000, fastThreshold=0)
-keypointMatcher = cv2.BFMatcher()#cv2.NORM_HAMMING, crossCheck=True)
+env = environment.FrankaArmEnvironment()
+for _ in range(250):
+    env.stepEnv()
+    #Let the environment come to rest before starting
+
+
+keypointExtracter = cv2.ORB_create(10000, fastThreshold=0)
+keypointMatcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
 
 path_live_rgb = dir_path + f"\\temp\\live-rgb.jpg"
 path_live_depth = dir_path + f"\\temp\\live-depth.jpg"
@@ -116,8 +124,8 @@ kp_init, des_init = keypointExtracter.detectAndCompute(img_init_rgb, None)
 plt.ion()
 plt.show()
 
-ERR_THRESHOLD = 50 #generic error between the two sets of points
-error = ERR_THRESHOLD + 1
+ERR_THRESHOLD = 1 #generic error between the two sets of points
+error = ERR_THRESHOLD - 1 #TESTING TO SKIP THIS ALIGNMENT, MAKE + 1 TO ACTUALLY WORK     <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 while error > ERR_THRESHOLD:
     time.sleep(5)
     #save live image to temp folder
@@ -130,9 +138,11 @@ while error > ERR_THRESHOLD:
         # Brute force greedy match keypoints based on descriptors, as a first guess
         matches = keypointMatcher.match(des_live, des_init)
         matches = sorted(matches, key = lambda x:x.distance)
-        matches = matches[:10]
+        # l = len(matches)
+        # print(l)
+        matches = matches[:500]
         # GMS (Grid-based Motion Statistics) algorithm refines the guess for high quality matches
-        #matches_gms = cv2.xfeatures2d.matchGMS(img_live_rgb.shape, img_init_rgb.shape, kp_live, kp_init, matches, withRotation=True, withScale=True)
+        matches_gms = cv2.xfeatures2d.matchGMS(img_live_rgb.shape, img_init_rgb.shape, kp_live, kp_init, matches, withRotation=True, withScale=True)
 
         matchImg = cv2.drawMatches(img_live_rgb,kp_live,img_init_rgb,kp_init,matches,None,flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         plt.imshow(matchImg)
@@ -142,28 +152,30 @@ while error > ERR_THRESHOLD:
         points_live, points_init = [], []
         for m in matches:
             x, y = kp_live[m.queryIdx].pt
-            points_live.append( (int(x), int(y)) )
+            points_live.append( (x, y) )
 
             u, v = kp_init[m.trainIdx].pt
-            points_init.append( (int(u), int(v)) )
+            points_init.append( (u, v) )
 
         if len(points_live) == 0 or len(points_init) == 0:
-            raise Exception("No keypoints found. This is a big problem!")
+            #raise Exception("No keypoints found. This is a big problem!")
+            env.robotSetJointAngles(env.restPoses)
+            #env.resetEnv()
+            continue
+            #move the robot back to start position and try again
 
         #Given the pixel coordinates of the correspondences, add the depth channel
         points_live = add_depth(points_live, path_live_depth)
         points_init = add_depth(points_init, path_init_depth)
         R, t = find_transformation(points_live, points_init)
 
-        print(R)
-        print(t)
-
-        #A function to convert pixel distance into meters based on calibration of camera.
-        t_meters = t * 0.001
-        #I think its 1 pixel is 1mm according to some sources, move to a env method
+        #Convert pixel distance into meters based on calibration of camera.
+        t_meters = env.pixelsToMetres(t)
+        print(t_meters)
 
         #Move robot
         env.robotMoveEefPosition(t_meters,R)
+
         error = compute_error(points_live, points_init)
         print(error)
 
@@ -173,23 +185,42 @@ plt.close()
 with open(dir_path + f"\\demonstrations\\{best[1]}.pkl", 'rb') as f:
     trace = pickle.load(f)
 
-#--- we need to add the alligned eef pos and orn to each keyframe of the trace
-# but actually we only need to add the difference between the final alligned pos and the rest pos we started at.
-# so we need to so like demo + aligned - rest which is fine for pos but how do you do that for orn???
 alligned_pos, alligned_orn = env.robotGetEefPosition()
+
+#testing
+alligned_pos = [p+t for (p,t) in zip(env.restPos, [0,0.05,0])]
+alligned_orn = env.getQuaternionFromMatrix(np.dot(env.getMatrixFromQuaternion(env.restOrn),env.getMatrixFromQuaternion(env.getQuaternionFromEuler([0,0,np.pi/3]))))
+#---- should print out offset 0.05 and pi/3
+
+offset_pos, offset_orn = env.calculateOffset(env.restPos, env.restOrn, alligned_pos, alligned_orn)
+print(f"Alligned offset: {offset_pos}, {offset_orn}")
+print(env.getEulerFromQuaternion(offset_orn))
+
+#---testing
+# offset_pos = [0,0.05,0]
+# offset_orn = env.getQuaternionFromEuler([0,0,np.pi/3])
+#--- Should pick up brick by the sides not corners
+
+offset_mat = env.getMatrixFromQuaternion(offset_orn)
 
 for keyFrame in range(len(trace)):
     demo_pos, demo_orn, demo_gripper = trace[keyFrame]
+    desired_pos, desired_orn = env.offsetMovementLocal(demo_pos, demo_orn, offset_pos, offset_mat)
 
-    offset_pos, offset_orn = env.offsetMovementInverse(alligned_pos, alligned_orn, env.restPos, env.restOrn)
-    desired_pos, desired_orn = env.offsetMovement(demo_pos, demo_orn, offset_pos, offset_orn)
-
-    print(offset_pos, offset_orn)
-    print(desired_pos, desired_orn)
-
-    env.robotSetEefPosition(desired_pos, desired_orn)
+    env.robotSetEefPosition(desired_pos, desired_orn, interpolationSteps=250)
     env.robotCloseGripper() if demo_gripper else env.robotOpenGripper()
-#---
+
 
 while True:
     env.stepEnv()
+
+
+"""
+I think the reson its fucked is the eef is kinda upside down. So if we need to move it 0.2 in the x direction (world coords)
+then we actually need to move -0.2 in local eef coords. Im not sure how this affects the rotation.
+Just play about until both tests work as expected and the arm is moving in the direction youd expect
+
+The calculateOffset function is working. Dont change this. It calculates the offset that occured correctly
+Whats going wrong is what we do with that offset. The offsetMovementLocal needs changing to account for the fact
+the eef is rotated 180
+"""

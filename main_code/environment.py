@@ -21,7 +21,7 @@ class FrankaArmEnvironment:
             self.loggerId = p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, out_dir + f"\\videolog-{timestamp}.mp4")
 
         self.startEnv()
-        
+
 
     def startEnv(self):
         #set object variables
@@ -29,33 +29,30 @@ class FrankaArmEnvironment:
         self.planeId = p.loadURDF("plane.urdf")
         self.robotId = p.loadURDF("franka_panda/panda.urdf", [0, 0, 0], [0, 0, 0, 1], useFixedBase=True)
         self.tableId = p.loadURDF("table/table.urdf", [0.6, 0, -0.2], p.getQuaternionFromEuler([0,0,np.pi/2]), useFixedBase=True)
-        self.objectId = p.loadURDF("urdf/mug.urdf", [0.6, 0.01, 0.45], [0, 0, 0, 1])
-        self.debugLines = [[-1,(1,0,0),[0,1,0]], [-1,(0,1,0),[0,0,1]], [-1,(0,0,1),[1,0,0]]]  #list of [id, vector, colour]
+        #self.objectId = p.loadURDF("urdf/mug.urdf", [0.63, 0.05, 0.45], [0, 0, 0, 1])
+        self.objectId = p.loadURDF("lego/lego.urdf", [0.6, 0.05, 0.45], p.getQuaternionFromEuler([0,0,np.pi/3]))
+        self.debugLines = [[-1,(1,0,0),[1,0,0]], [-1,(0,1,0),[0,1,0]], [-1,(0,0,1),[0,0,1]]]  #list of [id, vector, colour]
 
-        self.numJoints = p.getNumJoints(self.robotId)
-        self.fixed_joints = [7,8,11] #These joints are fixed and cannot move
-        self.eefId = self.numJoints - 1
-        self.dof = self.numJoints - len(self.fixed_joints)
+        self.numAllJoints = p.getNumJoints(self.robotId)
+        self.eefId = self.numAllJoints - 1
+        self.dof = self.numAllJoints - 3        #3 of the joints are not actuated and cannot be controlled
+        self.numControlledJoints = self.dof - 2 #Gripper is controlled specially, not by setting its position, so we only expect
+                                                # numControlledJoints (7) angles to be passed to the relevant functions
 
         self.lowerLimits = []
         self.upperLimits = []
         self.jointRanges = []
-        self.restPoses = [-0.0016406124581102627, 0.026211667016220668, 0.002989846306765971, -0.9495545304254569, -5.895048550690606e-05, 1.2393585715718878, -1.7747677120392198e-05, 0.0, 0.0, -9.177073744494914e-20, 0.00065723506632391, 0.0]
-        for i in range(self.numJoints):
+        self.restPoses = [0.0, 0.0, 0.0, -0.375 * np.pi, 0.0, 0.375 * np.pi, 0.25 * np.pi, 0.0, 0.0, 0.0, 0.0, 0.0]
+        for i in range(self.numControlledJoints):
             jointInfo = p.getJointInfo(self.robotId, i)
             self.lowerLimits.append(jointInfo[8])
             self.upperLimits.append(jointInfo[9])
             self.jointRanges.append(jointInfo[9] - jointInfo[8])
-            
             p.resetJointState(self.robotId, i, self.restPoses[i])
         self.restPos, self.restOrn = self.robotGetEefPosition()
+        self.gripperClosed = True
 
-        self.useNullSpace = False
-
-        self.debugCameraYaw = 50.0
-        self.debugCameraPitch = -35.0
-        self.debugCameraDist = 5.0
-        self.debugCameraTarget = [0,0,0]
+        self.useNullSpace = True
 
         self.imgSize = 224
         self.fov = 60 #degrees?
@@ -63,15 +60,17 @@ class FrankaArmEnvironment:
         self.nearplane = 0.01 # wtf are these units? gotta figure that out
         self.farplane = 100
         self.projectionMatrix = p.computeProjectionMatrixFOV(self.fov, self.aspect, self.nearplane, self.farplane)
-        print("Projection matrix")
-        print(np.array(self.projectionMatrix).reshape((4,4)))
-        print("")
 
 
     def stepEnv(self):
         p.stepSimulation()
         self.drawDebugLines()
         time.sleep(1./240.)
+
+
+    def resetEnv(self):
+        p.resetSimulation()
+        self.startEnv()
 
 
     def closeEnv(self):
@@ -82,12 +81,16 @@ class FrankaArmEnvironment:
 
 
     def robotGetJointAngles(self):
-        return [p.getJointState(self.robotId, i)[0] for i in range(self.numJoints)]
+        return [p.getJointState(self.robotId, i)[0] for i in range(self.numControlledJoints)]
     
 
     def robotSetJointAngles(self, desiredAngles, interpolationSteps=100):
-        #Desired angles should be a list of size 12. Even though joints 7,8,11 are fixed and the values
-        # will be ignored, the list needs to be size 12
+        """
+        Desired angles should be a list of size numControlledJoints (7).
+        Joints 0-6 are controlled by desiredAngles
+        Joints 7,8,11 are fixed and not actuated
+        Joints 9,10 are the gripper fingers and are controlled seperately by robotCloseGripper() and robotOpenGripper()
+        """
         for i in range(interpolationSteps):
             alpha = (i+1) / interpolationSteps
             interpolatedPosition = [(1 - alpha) * prev + alpha * desired for prev, desired in zip(self.robotGetJointAngles(), desiredAngles)]
@@ -98,6 +101,13 @@ class FrankaArmEnvironment:
                                         p.POSITION_CONTROL,
                                         targetPositions=interpolatedPosition,
                                         forces=forces)
+            
+            velocities = [-1,-1] if self.gripperClosed else [1,1]
+            p.setJointMotorControlArray(self.robotId, 
+                                        [9,10],
+                                        p.VELOCITY_CONTROL,
+                                        targetVelocities=velocities,
+                                        forces=[10,10])
             
             self.stepEnv()
             #step env is probably needed. Its definatley needed to see the movement, but i wonder if
@@ -122,60 +132,58 @@ class FrankaArmEnvironment:
         else:
             jointAngles = list(p.calculateInverseKinematics(self.robotId, self.eefId, pos, orn))
 
-        for i in self.fixed_joints:
-            jointAngles.insert(i, 0)
+        jointAngles = jointAngles[:self.numControlledJoints]
         #inverse kinematics returns a list of size dof (for this robot 9)
-        # but when setting joint angles we expect to set every joint (all 12, even though the fixed ones will be ignored)
-        # easiest to add dummy values for these joints before setting angles, they will be ignored anyway
+        # but when setting joint angles we only set the numControlledJoints (7) joints of the arm
+        # the two joints of the gripper are handled differently
 
         self.robotSetJointAngles(jointAngles, interpolationSteps=interpolationSteps)
 
 
     def robotMoveEefPosition(self, translation, rotationMatrix, interpolationSteps=100):
         pos, orn = self.robotGetEefPosition()
-        rotation = Rotation.from_matrix(rotationMatrix)
-        rotation = rotation.as_quat()
-        newPos, newOrn = p.multiplyTransforms(pos, orn, translation, rotation.tolist())
+        
+        # quat = self.getQuaternionFromMatrix(rotationMatrix)
+        # newPos, newOrn = p.multiplyTransforms(pos, orn, translation, quat)
+
+        newPos, newOrn = self.offsetMovementLocal(pos, orn, translation, rotationMatrix)
 
         self.robotSetEefPosition(newPos, newOrn, interpolationSteps=interpolationSteps)
 
 
-    def offsetMovement(self, pos, orn, dPos, dOrn):
+    def offsetMovementLocal(self, pos, orn, translation, rotationMatrix):
         """
-        'Add' dPos and dOrn as an offset to pos and orn
+        Take pos and orn and add translation and rotate by rotationMatrix in local space, about the current position (not about the world origin)
         """
-        return p.multiplyTransforms(pos, orn, dPos, dOrn)
+        newPos = [p + t for (p,t) in zip(pos, translation)]
+        ornMat = np.array(p.getMatrixFromQuaternion(orn)).reshape((3,3))
+        newOrnMat = np.dot(ornMat, rotationMatrix)
+        newOrn = self.getQuaternionFromMatrix(newOrnMat)
+
+        return (newPos, newOrn)
     
 
-    def offsetMovementInverse(self, pos, orn, dPos, dOrn):
+    def calculateOffset(self, posA, ornA, posB, ornB):
         """
-        'Subtract' dPos and dOrn as an offset from pos and orn
+        Calculate offset from posA, ornA to posB, ornB
         """
-        dPos2, dOrn2 = p.invertTransform(dPos, dOrn)
-        print(dPos, dPos2, dOrn, dOrn2)
-        return p.multiplyTransforms(pos, orn, dPos2, dOrn2)
+        # dPos, dOrn = p.invertTransform(posB, ornB)
+        # return p.multiplyTransforms(posA, ornA, dPos, dOrn)
+        
+        # dPos, dOrn = p.invertTransform(posA, ornA)
+        # return p.multiplyTransforms(posB, ornB, dPos, dOrn)
     
+        dPos = [b-a for (a,b) in zip(posA, posB)]
+        dOrn = p.getDifferenceQuaternion(ornB, ornA)
+        return (dPos, dOrn)
+
 
     def robotCloseGripper(self):
-        """
-        Closes the gripper as far as possible. Does not move other joints
-        Gripper joints are joints id 9 and 10
-        """
-        joints = self.robotGetJointAngles()
-        joints[9] = self.lowerLimits[9]
-        joints[10] = self.lowerLimits[10]
-        self.robotSetJointAngles(joints, interpolationSteps=5)
+        self.gripperClosed = True
 
 
     def robotOpenGripper(self):
-        """
-        Opens the gripper as far as possible. Does not move other joints
-        Gripper joints are joints id 9 and 10
-        """
-        joints = self.robotGetJointAngles()
-        joints[9] = self.upperLimits[9]
-        joints[10] = self.upperLimits[10]
-        self.robotSetJointAngles(joints, interpolationSteps=5)
+        self.gripperClosed = False
 
 
     def robotGetCameraSnapshot(self):
@@ -232,10 +240,44 @@ class FrankaArmEnvironment:
         """
         Convert depth buffer (a 2d numpy array of image values 0-255) to an
         array of the same size, with values which store the actual depth values
+        calculated from camera calibration
         """
         depthBuffer = depthBuffer.astype(np.float32) * 1.0 / 255.0
         depth = self.farplane * self.nearplane / (self.farplane - (self.farplane - self.nearplane) * depthBuffer)
         return depth
+    
+
+    def pixelsToMetres(self, pixels):
+        """
+        Convert distance measured in pixels of images to distance in metres
+        based on the calibration of the camera pixel density
+        """
+        #Some sources say 1 pixel is 1mm. Seems correct
+        return pixels * 0.001
+    
+
+    def getQuaternionFromEuler(self, e):
+        #Expose pybullet conversion functions so main code doesnt need to import pybullet itself
+        return p.getQuaternionFromEuler(e)
+    
+    def getEulerFromQuaternion(self, q):
+        #Expose pybullet conversion functions so main code doesnt need to import pybullet itself
+        return p.getEulerFromQuaternion(q)
+    
+    def getMatrixFromQuaternion(self, q):
+        #Expose pybullet conversion functions so main code doesnt need to import pybullet itself
+        return np.array(p.getMatrixFromQuaternion(q)).reshape((3,3))
+    
+    def getQuaternionFromMatrix(self, m):
+        #Pybullet doesnt have all the necessary conversion functions. Because it couldnt be easy could it
+        rotation = Rotation.from_matrix(m)
+        return rotation.as_quat().tolist()
+    
+    def getMatrixFromEuler(self, e):
+        return self.getMatrixFromQuaternion(self.getQuaternionFromEuler(e))
+    
+    def getEulerFromMatrix(self, m):
+        return self.getEulerFromQuaternion(self.getQuaternionFromMatrix(m))
 
 
     def getDebugCameraState(self):
@@ -259,7 +301,7 @@ class FrankaArmEnvironment:
             lineVector = rotationMatrix.dot(line[1])
             stop = start + 0.2 * lineVector
 
-            line[0] = p.addUserDebugLine(start, stop, line[2], replaceItemUniqueId=line[-0])
+            line[0] = p.addUserDebugLine(start, stop, line[2], replaceItemUniqueId=line[0])
 
 
 
@@ -267,6 +309,7 @@ class FrankaArmEnvironment:
 #Testing
 if __name__ == "__main__":
     env = FrankaArmEnvironment()
+
     targetPosXId = p.addUserDebugParameter("targetPosX",-1,1,0.5)
     targetPosYId = p.addUserDebugParameter("targetPosY",-1,1,0)
     targetPosZId = p.addUserDebugParameter("targetPosZ",-1,1,1)
