@@ -101,10 +101,10 @@ def extract_corresponding_keypoints(img_live, img_init, displayMatches=True):
     matches = matches[:500]
 
     # GMS (Grid-based Motion Statistics) algorithm refines the guesses for high quality matches
-    #matches = cv2.xfeatures2d.matchGMS(imgLive.shape, imgInit.shape, kp_live, kp_init, matches, withRotation=True, withScale=True)
+    matchesGMS = cv2.xfeatures2d.matchGMS(img_live.shape, img_init.shape, kp_live, kp_init, matches, withRotation=True, withScale=True)
 
     if displayMatches:
-        matchImg = cv2.drawMatches(img_live, kp_live, img_init, kp_init, matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+        matchImg = cv2.drawMatches(img_live, kp_live, img_init, kp_init, matchesGMS, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         plt.imshow(matchImg)
         plt.pause(0.1)
 
@@ -154,10 +154,9 @@ img_init_rgb = cv2.imread(path_init_rgb, cv2.IMREAD_GRAYSCALE)
 plt.ion()
 plt.show()
 
-ERR_THRESHOLD = 1 #generic error between the two sets of points
-error = ERR_THRESHOLD - 1 #TESTING TO SKIP THIS ALIGNMENT, MAKE + 1 TO ACTUALLY WORK     <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+ERR_THRESHOLD = 1.0 #generic error between the two sets of points
+error = ERR_THRESHOLD + 1 #TESTING TO SKIP THIS ALIGNMENT, MAKE + 1 TO ACTUALLY WORK     <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 while error > ERR_THRESHOLD:
-    time.sleep(5)
     #save live image to temp folder
     env.robotSaveCameraSnapshot("live", dir_path + "\\temp")
 
@@ -171,6 +170,7 @@ while error > ERR_THRESHOLD:
             #move the robot back to start position and try again
             #raise Exception("No keypoints found. This is a big problem!")
             #env.resetEnv()
+            print("No keypoints found")
             env.robotSetJointAngles(env.restPoses)
             continue
 
@@ -181,11 +181,12 @@ while error > ERR_THRESHOLD:
 
         #Convert pixel distance into meters based on calibration of camera.
         t_meters = env.pixelsToMetres(t)
-        print(t_meters)
+
+        time.sleep(5)
 
         #Move robot
-        #TODO check if we need to rectufy the backwardness here too. If we do we can move it into the moveLocal function
-        env.robotMoveEefPosition(t_meters,R)
+        translation = t_meters#[-x for x in t_meters]
+        env.robotMoveEefPosition(translation,R)
 
         error = compute_error(points_live, points_init)
         print(error)
@@ -195,22 +196,10 @@ plt.close()
 #We are alligned, calculate the offset to apply to demo keyframes
 alligned_pos, alligned_orn = env.robotGetEefPosition()
 
-#testing
-alligned_pos = [p+t for (p,t) in zip(env.restPos, [0,0.05,0])]
-alligned_orn = env.getQuaternionFromMatrix(np.dot(env.getMatrixFromQuaternion(env.restOrn),env.getMatrixFromQuaternion(env.getQuaternionFromEuler([0,0,np.pi/3]))))
-#---- should print out offset [0,0.05,0] and [0,0,pi/3]   pi/3 = 1.047197
-
 offset_pos, offset_orn = env.calculateOffset(env.restPos, env.restOrn, alligned_pos, alligned_orn)
-print(f"Alligned offset: {offset_pos}, {offset_orn}")
-print(env.getEulerFromQuaternion(offset_orn))
-print(np.pi/3)
+print(f"Alligned offset:\n  Translation:{offset_pos},\n  Rotation (quat):{offset_orn},\n  Rotation (euler):{env.getEulerFromQuaternion(offset_orn)}")
 
-#---testing
-# offset_pos = [0,0.05,0]
-# offset_orn = env.getQuaternionFromEuler([0,0,np.pi/3])
-#--- Should pick up brick by the sides not corners
-
-offset_mat = env.getMatrixFromQuaternion(offset_orn)
+offset_ornMat = env.getMatrixFromQuaternion(offset_orn)
 
 #execute demo
 with open(dir_path + f"\\demonstrations\\{best[1]}.pkl", 'rb') as f:
@@ -218,9 +207,7 @@ with open(dir_path + f"\\demonstrations\\{best[1]}.pkl", 'rb') as f:
 
 for keyFrame in range(len(trace)):
     demo_pos, demo_orn, demo_gripper = trace[keyFrame]
-    desired_pos, desired_orn = env.offsetMovementLocal(demo_pos, demo_orn, offset_pos, offset_mat)
-
-    #TODO put something here to rectify the backwardsness
+    desired_pos, desired_orn = env.offsetMovementLocal(demo_pos, demo_orn, offset_pos, offset_ornMat)
 
     env.robotSetEefPosition(desired_pos, desired_orn, interpolationSteps=250)
     env.robotCloseGripper() if demo_gripper else env.robotOpenGripper()
