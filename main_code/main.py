@@ -96,12 +96,13 @@ def extract_corresponding_keypoints(img_live, img_init, displayMatches=True):
     matches = keypointMatcher.match(des_live, des_init)
     matches = sorted(matches, key=lambda x:x.distance)
 
-    #remove any matches which match between different objects 
+    #TODO remove any matches which match between different objects using segmentation map
 
     matches = matches[:500]
 
     # GMS (Grid-based Motion Statistics) algorithm refines the guesses for high quality matches
-    matchesGMS = cv2.xfeatures2d.matchGMS(img_live.shape, img_init.shape, kp_live, kp_init, matches, withRotation=True, withScale=True)
+    #matchesGMS = cv2.xfeatures2d.matchGMS(img_live.shape, img_init.shape, kp_live, kp_init, matches, withRotation=True, withScale=True)
+    matchesGMS = matches
 
     if displayMatches:
         matchImg = cv2.drawMatches(img_live, kp_live, img_init, kp_init, matchesGMS, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
@@ -110,8 +111,8 @@ def extract_corresponding_keypoints(img_live, img_init, displayMatches=True):
 
     #Extract matching coordinates
     points_live, points_init = [], []
-    for m in matches:
-        x, y = kp_live[m.queryIdx].pt #TODO check queryidx vs trainidx. Why is one one and one the other? are they the right way round?
+    for m in matchesGMS:
+        x, y = kp_live[m.queryIdx].pt
         points_live.append( (x, y) )
 
         u, v = kp_init[m.trainIdx].pt
@@ -149,7 +150,8 @@ print(f"Best match found: {best[1]}")
 path_init_rgb = dir_path + f"\\demonstrations\\{best[1]}-rgb.jpg"
 path_init_depth = dir_path + f"\\demonstrations\\{best[1]}-depth.jpg"
 
-img_init_rgb = cv2.imread(path_init_rgb, cv2.IMREAD_GRAYSCALE)
+img_init_rgb = cv2.imread(path_init_rgb, cv2.IMREAD_COLOR)
+img_init_rgb = cv2.cvtColor(img_init_rgb, cv2.COLOR_BGR2RGB)
 
 plt.ion()
 plt.show()
@@ -162,9 +164,16 @@ while error > ERR_THRESHOLD:
 
     with torch.no_grad(): #TODO: is this still needed?
         
-        img_live_rgb = cv2.imread(path_live_rgb, cv2.IMREAD_GRAYSCALE)
+        img_live_rgb = cv2.imread(path_live_rgb, cv2.IMREAD_COLOR)
+        img_live_rgb = cv2.cvtColor(img_live_rgb, cv2.COLOR_BGR2RGB)
         
         points_live, points_init = extract_corresponding_keypoints(img_live_rgb, img_init_rgb)
+        
+        #TESTING: manually defined keypoints
+        points_live = [(100, 148),(114, 148),(100, 163),(114, 163)]
+        points_init = [(3, 103),(18, 103),(3, 119),(18, 119)]
+        #It seems to be slightly missing. WHY?!?!?!?!
+        #for the test add a break so it doesnt keep trying to adjust
 
         if len(points_live) == 0 or len(points_init) == 0:
             #move the robot back to start position and try again
@@ -181,15 +190,15 @@ while error > ERR_THRESHOLD:
 
         #Convert pixel distance into meters based on calibration of camera.
         t_meters = env.pixelsToMetres(t)
+        translation = t_meters #[-x for x in t_meters]
+        print(f"Incremental Update:\n  Translation:{translation},\n  Rotation (Matrix):\n{R}\n  Rotation (euler):{env.getEulerFromMatrix(R)}\n")
 
         time.sleep(5)
-
-        #Move robot
-        translation = t_meters#[-x for x in t_meters]
         env.robotMoveEefPosition(translation,R)
 
         error = compute_error(points_live, points_init)
-        print(error)
+        print(f"Error: {error}")
+
 
 plt.close()
 
@@ -197,7 +206,7 @@ plt.close()
 alligned_pos, alligned_orn = env.robotGetEefPosition()
 
 offset_pos, offset_orn = env.calculateOffset(env.restPos, env.restOrn, alligned_pos, alligned_orn)
-print(f"Alligned offset:\n  Translation:{offset_pos},\n  Rotation (quat):{offset_orn},\n  Rotation (euler):{env.getEulerFromQuaternion(offset_orn)}")
+print(f"Alligned offset:\n  Translation:{offset_pos},\n  Rotation (quat):{offset_orn},\n  Rotation (euler):{env.getEulerFromQuaternion(offset_orn)}\n")
 
 offset_ornMat = env.getMatrixFromQuaternion(offset_orn)
 
