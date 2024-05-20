@@ -27,10 +27,10 @@ class FrankaArmEnvironment:
         #set object variables
 
         self.planeId = p.loadURDF("plane.urdf")
-        self.robotId = p.loadURDF("franka_panda/panda.urdf", [0, 0, 0], [0, 0, 0, 1], useFixedBase=True)
-        self.tableId = p.loadURDF("table/table.urdf", [0.6, 0, -0.2], p.getQuaternionFromEuler([0,0,np.pi/2]), useFixedBase=True)
-        #self.objectId = p.loadURDF("urdf/mug.urdf", [0.63, 0.05, 0.45], [0, 0, 0, 1])
-        self.objectId = p.loadURDF("lego/lego.urdf", [0.6, 0.05, 0.45], p.getQuaternionFromEuler([0,0,np.pi/3]))
+        self.robotId = p.loadURDF("franka_panda/panda.urdf", [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0], useFixedBase=True)
+        self.tableId = p.loadURDF("table/table.urdf", [0.6, 0.0, -0.2], p.getQuaternionFromEuler([0.0, 0.0, np.pi/2]), useFixedBase=True)
+        #self.objectId = p.loadURDF("urdf/mug.urdf", [0.63, 0.05, 0.45], [0.0, 0.0, 0.0, 1.0])
+        self.objectId = p.loadURDF("lego/lego.urdf", [0.6, 0.05, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
         self.debugLines = [[-1,(1,0,0),[1,0,0]], [-1,(0,1,0),[0,1,0]], [-1,(0,0,1),[0,0,1]]]  #list of [id, vector, colour]
 
         self.numAllJoints = p.getNumJoints(self.robotId)
@@ -60,6 +60,12 @@ class FrankaArmEnvironment:
         self.nearplane = 0.01 # wtf are these units? gotta figure that out
         self.farplane = 100
         self.projectionMatrix = p.computeProjectionMatrixFOV(self.fov, self.aspect, self.nearplane, self.farplane)
+
+        self.setDebugCameraState(2.0, 60.0, -35.0, [0.0, 0.2, 0.0])
+
+        #Let the environment come to rest before starting
+        for _ in range(250):
+            self.stepEnv()
 
 
     def stepEnv(self):
@@ -91,6 +97,10 @@ class FrankaArmEnvironment:
         Joints 7,8,11 are fixed and not actuated
         Joints 9,10 are the gripper fingers and are controlled seperately by robotCloseGripper() and robotOpenGripper()
         """
+        desiredAngles = desiredAngles[:self.numControlledJoints] 
+        #If too many joints given, ignore the extras. We should only set the angles for the 7 joints we control.
+        #The fixed joints should be ignored and gripper joints handled differenty
+
         for i in range(interpolationSteps):
             alpha = (i+1) / interpolationSteps
             interpolatedPosition = [(1 - alpha) * prev + alpha * desired for prev, desired in zip(self.robotGetJointAngles(), desiredAngles)]
@@ -110,10 +120,8 @@ class FrankaArmEnvironment:
                                         forces=[10,10])
             
             self.stepEnv()
-            #step env is probably needed. Its definatley needed to see the movement, but i wonder if
-            # setting to the goal state is actually fine and it moves smoothly or if the robot will just
-            # snap there. If we remove this and let the environment step only in the main loop,
-            # then interpolation steps arent needed
+            #step env and interpolation are needed to make the movement smooth and not try to snap
+            # to the desired angles as quickly as possible.
 
             #could also make the environment store a buffer of desired positions and step through them,
             # this would let us fill it with the interpolated steps, and the movements happen only
@@ -156,10 +164,14 @@ class FrankaArmEnvironment:
         Take pos and orn and add translation and rotate by rotationMatrix in local space, about the current position (not about the world origin)
         """
         newPos = [p + t for (p,t) in zip(pos, translation)]
-        ornMat = np.array(p.getMatrixFromQuaternion(orn)).reshape((3,3))
+        ornMat = self.getMatrixFromQuaternion(orn)
         newOrnMat = np.dot(ornMat, rotationMatrix)
         newOrn = self.getQuaternionFromMatrix(newOrnMat)
 
+        #pos = pos + orn.translation
+        # this should make the translation be in eef space not global.
+        # so then rotation AND translation should both be backwards because eef upside down
+        # if they are consistent then I can just slap it with a -1. Its the fact translation is fine but rotation wrong that makes it hard.
         return (newPos, newOrn)
     
 
@@ -196,7 +208,7 @@ class FrankaArmEnvironment:
           segmentation :: numpy array of segmentation map   TODO: work out the range of values, i dont actually use this anywhere yet
         """
         pos, orn = self.robotGetEefPosition()
-        rotationMatrix = np.array(p.getMatrixFromQuaternion(orn)).reshape((3, 3))
+        rotationMatrix = self.getMatrixFromQuaternion(orn)
 
         # Initial vectors
         initCameraVector = (0, 0, 1) # z-axis
@@ -252,7 +264,7 @@ class FrankaArmEnvironment:
         Convert distance measured in pixels of images to distance in metres
         based on the calibration of the camera pixel density
         """
-        #Some sources say 1 pixel is 1mm. Seems correct
+        #Some sources say 1 pixel is 1mm always in pybullet. Seems correct
         return pixels * 0.001
     
 
@@ -281,7 +293,9 @@ class FrankaArmEnvironment:
 
 
     def getDebugCameraState(self):
-        _, _, _, _, _, _, _, _, cameraDist, cameraYaw, cameraPitch, cameraTarget = p.getDebugVisualizerCamera()
+        _, _, _, _, _, _, _, _, cameraYaw, cameraPitch, cameraDist, cameraTarget = p.getDebugVisualizerCamera()
+        #For some reason pybullet getDebugCamera returns values in a differnt order to what setDebugCamera takes in.
+        # The env wrapper fixes this, but its not a bug, the order of values is correct even though it looks weird
         return (cameraDist, cameraYaw, cameraPitch, cameraTarget)
 
     def setDebugCameraState(self, cameraDist, cameraYaw, cameraPitch, cameraTarget=[0,0,0]):
@@ -295,7 +309,7 @@ class FrankaArmEnvironment:
         where vector is relative to the robots eef and colour is a list [R,G,B] with values 0..1
         """
         start, orn = self.robotGetEefPosition()
-        rotationMatrix = np.array(p.getMatrixFromQuaternion(orn)).reshape((3, 3))
+        rotationMatrix = self.getMatrixFromQuaternion(orn)
 
         for line in self.debugLines:
             lineVector = rotationMatrix.dot(line[1])

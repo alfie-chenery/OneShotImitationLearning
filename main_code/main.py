@@ -11,8 +11,6 @@ import matplotlib.pyplot as plt
 import time
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-
-
 dino = torch.hub.load('facebookresearch/dino:main', 'dino_vitb8')
 
 image_transforms = T.Compose([
@@ -69,6 +67,10 @@ def find_transformation(X, Y):
 
 
 def add_depth(points, depth_path):
+    """
+    Takes in a list of (x,y) keypoints, and path to the depth image
+    Returns list of (x,y,z) keypoints
+    """
     #TODO can i do this with cv2 and then not need PIL as a dependency???
     depthImg = Image.open(depth_path)
     depth = env.calculateDepthFromBuffer(np.array(depthImg))
@@ -86,15 +88,43 @@ def compute_error(points1, points2):
     # to be fair we should normalise by the number of matches. Ie mean instead of sum
 
 
+def extract_corresponding_keypoints(img_live, img_init, displayMatches=True):
+    kp_live, des_live = keypointExtracter.detectAndCompute(img_live, None)
+    kp_init, des_init = keypointExtracter.detectAndCompute(img_init, None)
+
+    # Brute force greedy match keypoints based on descriptors, as a first guess
+    matches = keypointMatcher.match(des_live, des_init)
+    matches = sorted(matches, key=lambda x:x.distance)
+
+    #remove any matches which match between different objects 
+
+    matches = matches[:500]
+
+    # GMS (Grid-based Motion Statistics) algorithm refines the guesses for high quality matches
+    #matches = cv2.xfeatures2d.matchGMS(imgLive.shape, imgInit.shape, kp_live, kp_init, matches, withRotation=True, withScale=True)
+
+    if displayMatches:
+        matchImg = cv2.drawMatches(img_live, kp_live, img_init, kp_init, matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+        plt.imshow(matchImg)
+        plt.pause(0.1)
+
+    #Extract matching coordinates
+    points_live, points_init = [], []
+    for m in matches:
+        x, y = kp_live[m.queryIdx].pt #TODO check queryidx vs trainidx. Why is one one and one the other? are they the right way round?
+        points_live.append( (x, y) )
+
+        u, v = kp_init[m.trainIdx].pt
+        points_init.append( (u, v) )
+
+    return (points_live, points_init)
+
+
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f"Device: {device}")
 
 env = environment.FrankaArmEnvironment()
-for _ in range(250):
-    env.stepEnv()
-    #Let the environment come to rest before starting
-
 
 keypointExtracter = cv2.ORB_create(10000, fastThreshold=0)
 keypointMatcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
@@ -115,11 +145,11 @@ for key in demo_img_emb.keys():
         best = (sim, key)
 
 #load bottleneck image
+print(f"Best match found: {best[1]}")
 path_init_rgb = dir_path + f"\\demonstrations\\{best[1]}-rgb.jpg"
 path_init_depth = dir_path + f"\\demonstrations\\{best[1]}-depth.jpg"
 
 img_init_rgb = cv2.imread(path_init_rgb, cv2.IMREAD_GRAYSCALE)
-kp_init, des_init = keypointExtracter.detectAndCompute(img_init_rgb, None)
 
 plt.ion()
 plt.show()
@@ -134,35 +164,15 @@ while error > ERR_THRESHOLD:
     with torch.no_grad(): #TODO: is this still needed?
         
         img_live_rgb = cv2.imread(path_live_rgb, cv2.IMREAD_GRAYSCALE)
-        kp_live, des_live = keypointExtracter.detectAndCompute(img_live_rgb, None)
-        # Brute force greedy match keypoints based on descriptors, as a first guess
-        matches = keypointMatcher.match(des_live, des_init)
-        matches = sorted(matches, key = lambda x:x.distance)
-        # l = len(matches)
-        # print(l)
-        matches = matches[:500]
-        # GMS (Grid-based Motion Statistics) algorithm refines the guess for high quality matches
-        matches_gms = cv2.xfeatures2d.matchGMS(img_live_rgb.shape, img_init_rgb.shape, kp_live, kp_init, matches, withRotation=True, withScale=True)
-
-        matchImg = cv2.drawMatches(img_live_rgb,kp_live,img_init_rgb,kp_init,matches,None,flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-        plt.imshow(matchImg)
-        plt.pause(0.1)
-
-        #Extract matching coordinates
-        points_live, points_init = [], []
-        for m in matches:
-            x, y = kp_live[m.queryIdx].pt
-            points_live.append( (x, y) )
-
-            u, v = kp_init[m.trainIdx].pt
-            points_init.append( (u, v) )
+        
+        points_live, points_init = extract_corresponding_keypoints(img_live_rgb, img_init_rgb)
 
         if len(points_live) == 0 or len(points_init) == 0:
-            #raise Exception("No keypoints found. This is a big problem!")
-            env.robotSetJointAngles(env.restPoses)
-            #env.resetEnv()
-            continue
             #move the robot back to start position and try again
+            #raise Exception("No keypoints found. This is a big problem!")
+            #env.resetEnv()
+            env.robotSetJointAngles(env.restPoses)
+            continue
 
         #Given the pixel coordinates of the correspondences, add the depth channel
         points_live = add_depth(points_live, path_live_depth)
@@ -174,6 +184,7 @@ while error > ERR_THRESHOLD:
         print(t_meters)
 
         #Move robot
+        #TODO check if we need to rectufy the backwardness here too. If we do we can move it into the moveLocal function
         env.robotMoveEefPosition(t_meters,R)
 
         error = compute_error(points_live, points_init)
@@ -181,20 +192,18 @@ while error > ERR_THRESHOLD:
 
 plt.close()
 
-#execute demo
-with open(dir_path + f"\\demonstrations\\{best[1]}.pkl", 'rb') as f:
-    trace = pickle.load(f)
-
+#We are alligned, calculate the offset to apply to demo keyframes
 alligned_pos, alligned_orn = env.robotGetEefPosition()
 
 #testing
 alligned_pos = [p+t for (p,t) in zip(env.restPos, [0,0.05,0])]
 alligned_orn = env.getQuaternionFromMatrix(np.dot(env.getMatrixFromQuaternion(env.restOrn),env.getMatrixFromQuaternion(env.getQuaternionFromEuler([0,0,np.pi/3]))))
-#---- should print out offset 0.05 and pi/3
+#---- should print out offset [0,0.05,0] and [0,0,pi/3]   pi/3 = 1.047197
 
 offset_pos, offset_orn = env.calculateOffset(env.restPos, env.restOrn, alligned_pos, alligned_orn)
 print(f"Alligned offset: {offset_pos}, {offset_orn}")
 print(env.getEulerFromQuaternion(offset_orn))
+print(np.pi/3)
 
 #---testing
 # offset_pos = [0,0.05,0]
@@ -203,9 +212,15 @@ print(env.getEulerFromQuaternion(offset_orn))
 
 offset_mat = env.getMatrixFromQuaternion(offset_orn)
 
+#execute demo
+with open(dir_path + f"\\demonstrations\\{best[1]}.pkl", 'rb') as f:
+    trace = pickle.load(f) 
+
 for keyFrame in range(len(trace)):
     demo_pos, demo_orn, demo_gripper = trace[keyFrame]
     desired_pos, desired_orn = env.offsetMovementLocal(demo_pos, demo_orn, offset_pos, offset_mat)
+
+    #TODO put something here to rectify the backwardsness
 
     env.robotSetEefPosition(desired_pos, desired_orn, interpolationSteps=250)
     env.robotCloseGripper() if demo_gripper else env.robotOpenGripper()
