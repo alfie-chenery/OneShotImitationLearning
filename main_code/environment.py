@@ -5,6 +5,7 @@ import time
 from datetime import datetime
 from scipy.spatial.transform import Rotation
 from PIL import Image
+from math import tan, radians
     
 
 class FrankaArmEnvironment:
@@ -54,12 +55,14 @@ class FrankaArmEnvironment:
 
         self.useNullSpace = True
 
-        self.imgSize = 224
+        self.imgSize = 1024
         self.fov = 60 #degrees?
         self.aspect = 1.0     # leave as 1 for square image
         self.nearplane = 0.01 # wtf are these units? gotta figure that out
         self.farplane = 100
         self.projectionMatrix = p.computeProjectionMatrixFOV(self.fov, self.aspect, self.nearplane, self.farplane)
+        self.focalLength = self.imgSize / (2 * tan(radians(self.fov) / 2))
+        self.principalPoint = (self.imgSize / 2, self.imgSize / 2) #principal point in center of image
 
         self.setDebugCameraState(2.0, 60.0, -35.0, [0.0, 0.2, 0.0])
 
@@ -269,7 +272,7 @@ class FrankaArmEnvironment:
         Convert distance measured in pixels of images to distance in metres
         based on the calibration of the camera pixel density
         """
-        #Some sources say 1 pixel is 1mm always in pybullet. Seems correct
+        #Some sources say 1 pixel is 1mm always in pybullet. Seems very incorrect
         return pixels * 0.001
     
 
