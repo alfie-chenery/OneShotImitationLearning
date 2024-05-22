@@ -10,6 +10,7 @@ import os
 import matplotlib.pyplot as plt
 import time
 import keyboard
+from scipy.spatial.transform import Rotation
 
 class NoKeypointsException(Exception):
     pass
@@ -51,50 +52,78 @@ def loadEmbeddings():
     return embeddings
 
 
-def find_transformation(X, Y):
-    #Find transformation given two sets of correspondences between 3D points
-    # Calculate centroids
-    cX = np.mean(X, axis=0)
-    cY = np.mean(Y, axis=0)
-    # Subtract centroids to obtain centered sets of points
-    Xc = X - cX
-    Yc = Y - cY
-    # Calculate covariance matrix
-    C = np.dot(Xc.T, Yc)
-    # Compute SVD
-    U, S, Vt = np.linalg.svd(C)
-    # Determine rotation matrix
-    R = np.dot(Vt.T, U.T)
-    # Correct for reflection (ensure a proper rotation matrix)
-    if np.linalg.det(R) < 0:
-        Vt[-1, :] *= -1
-        R = np.dot(Vt.T, U.T)
-    # Determine translation vector
-    t = cY - np.dot(R, cX)
+def find_transformation(P, Q):
+    """
+    Find transformation given two sets of correspondences between 3D points
+    The transformation maps Q onto P (as close as possible)
+    """
+    assert P.shape == Q.shape
+    n, m = P.shape
+
+    centroidP = np.mean(P, axis=0)
+    centroidQ = np.mean(Q, axis=0)
+    varianceP = np.var(P, axis=0)
+
+    #Subtract centroids to obtain centered sets of points
+    Pcentered = P - centroidP
+    Qcentered = Q - centroidQ
+
+    cov = (Pcentered.T @ Qcentered) / n
+
+    #Compute Single Value Decomposition
+    U, E, Vt = np.linalg.svd(cov)
+
+    #Create sign matrix to correct for reflections
+    sign = np.linalg.det(U) * np.linalg.det(Vt)
+    S = np.diag([1] * (m-1) + [sign])
+
+    #Compute rotation matrix
+    #R = Vt.T @ S @ U
+    R = U @ S @ Vt
+    
+    #if the rotation is the wrong way just transpose it lol
+
+    #Compute scale factor
+    c = varianceP / np.trace(np.diag(E) @ S)
+    print(c)
+
+    #Compute translation vector
+    #t = centroidQ - np.dot(R, centroidP)
+    #t = centroidP - R @ centroidQ
+    t = centroidQ - R @ centroidP
+
+
+    Q_prime = np.array([t + c * R @ p for p in P])
+
     return R, t
 
 
-def convert_to_world_coords(points, depth_path):
+def convert_to_world_coords(points, depth_path, viewMatrix):
     """
-    Takes in a list of (x',y') keypoints as pixel locations found from the image, and path to the depth image
-    Returns list of (x,y,z) keypoints in world space units, relative to the image principal point
+    Takes in a list of (x,y) keypoints as pixel locations found from the image, and path to the depth image
+    Returns numpy array of shape (N,3). Rows of (X,Y,Z) keypoints in world coordinates
     """
     #TODO can i do this with cv2 and then not need PIL as a dependency???
     depthImg = Image.open(depth_path)
     depth = env.calculateDepthFromBuffer(np.array(depthImg))
+    h, w = depth.shape
+    out = []
 
-    cx, cy = env.principalPoint
-    f = env.focalLength
-    worldPoints = []
+    projectionMatrix = np.array(env.projectionMatrix).reshape((4,4), order='F')
+    viewMatrix = np.array(viewMatrix).reshape((4,4), order='F')
+    pixel2World = np.linalg.inv(projectionMatrix @ viewMatrix)
 
     for (x,y) in points:
-        Z = depth[int(y), int(x)] #TODO: consider interpolating between pixel depths rather than rounding to nearest pixel
-        X = (x - cx) * Z / f
-        #y = env.imgSize - y #flip y coord because image y increases downwards???
-        Y = (y - cy) * Z / f
-        worldPoints.append( (X,Y,Z) )
+        X = (2*x - w)/w
+        Y = -(2*y - h)/h
+        Z = 2*depth[y,x] - 1
+        pixPos = np.asarray([X, Y, Z, 1])          #homogoneous coordinates
+        position = pixel2World @ pixPos
+        position = position / position[3]
 
-    return worldPoints
+        out.append(position.tolist()[:3])
+
+    return np.array(out)    
     
 
 
@@ -177,8 +206,9 @@ path_init_rgb = dir_path + f"\\demonstrations\\{best[1]}-rgb.jpg"
 path_init_depth = dir_path + f"\\demonstrations\\{best[1]}-depth.jpg"
 
 img_init_rgb = cv2.imread(path_init_rgb, cv2.IMREAD_GRAYSCALE)
+initView = env.robotGetCameraViewMatrix()
 
-ERR_THRESHOLD = 0.01 #generic error between the two sets of points
+ERR_THRESHOLD = 0.001 #generic error between the two sets of points
 error = ERR_THRESHOLD + 1 #TESTING -1 TO SKIP THIS ALIGNMENT, MAKE + 1 TO ACTUALLY WORK     <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 while error > ERR_THRESHOLD:
     #save live image to temp folder
@@ -190,21 +220,25 @@ while error > ERR_THRESHOLD:
         points_live, points_init = extract_corresponding_keypoints(img_live_rgb, img_init_rgb)
 
         #TESTING
-        points_init = [(10, 445),(140, 445),(10, 574),(140, 574)]
-        points_live = [(421, 650),(551, 650),(421, 779),(551, 779)]
+        # points_init = [(10, 445),(140, 445),(10, 574),(140, 574)]
+        # points_live = [(421, 650),(551, 650),(421, 779),(551, 779)]
+        points_init = [(11, 446),(139, 446),(10, 573),(139, 573)]
+        points_live = [(422, 651),(550, 651),(422, 778),(550, 778)]
         
         #Given the pixel coordinates of the correspondences, add the depth channel
-        points_live = convert_to_world_coords(points_live, path_live_depth)
-        points_init = convert_to_world_coords(points_init, path_init_depth)
-        print(points_live, points_init)
+        camTranslation, camRotation = env.robotGetEefPosition()
+        camRotation = env.getMatrixFromQuaternion(camRotation)
+
+        #TODO: the view matrix needs to be the one when the picture was taken, this is a new thing we need to save.
+        # Should not be the current one
+
+        points_live = convert_to_world_coords(points_live, path_live_depth, env.robotGetCameraViewMatrix())
+        points_init = convert_to_world_coords(points_init, path_init_depth, initView)
         R, t = find_transformation(points_live, points_init)
 
         #TESTING
-        #\R = np.identity(3)
+        #R = np.identity(3)
 
-        #Convert pixel distance into meters based on calibration of camera.
-        #t_meters = env.pixelsToMetres(t)
-        #translation = t_meters #[-x for x in t_meters]
         print(f"Incremental Update:\n  Translation:{t},\n  Rotation (Matrix):\n{R}\n  Rotation (euler):{env.getEulerFromMatrix(R)}\n")
 
         error = compute_error(points_live, points_init)
@@ -224,6 +258,7 @@ while error > ERR_THRESHOLD:
         # env.robotMoveEefPosition(randomTranslation, np.identity(3))
         continue
 
+    #TESTING
     break
 
 

@@ -206,15 +206,7 @@ class FrankaArmEnvironment:
         self.gripperClosed = False
 
 
-    def robotGetCameraSnapshot(self):
-        """
-        Get camera snapshot as mounted on end effector
-        Returns: (width, height, rgb, depthBuffer, segmentation)
-          width, height :: int, of all images
-          rgb :: numpy array of rgb values 0-255
-          depthBuffer :: numpy array of depth proportions 0-255. To calculate actual depth pass to env.calculateDepthFromBuffer()
-          segmentation :: numpy array of segmentation map   TODO: work out the range of values, i dont actually use this anywhere yet
-        """
+    def robotGetCameraViewMatrix(self):
         pos, orn = self.robotGetEefPosition()
         rotationMatrix = self.getMatrixFromQuaternion(orn)
 
@@ -224,7 +216,19 @@ class FrankaArmEnvironment:
         # Rotated vectors
         cameraVector = rotationMatrix.dot(initCameraVector)
         upVector = rotationMatrix.dot(initUpVector)
-        viewMatrix = p.computeViewMatrix(pos, pos + 0.1 * cameraVector, upVector)
+        return p.computeViewMatrix(pos, pos + 0.1 * cameraVector, upVector)
+
+
+    def robotGetCameraSnapshot(self):
+        """
+        Get camera snapshot as mounted on end effector
+        Returns: (width, height, rgb, depthBuffer, segmentation)
+          width, height :: int, of all images
+          rgb :: numpy array of rgb values 0-255
+          depthBuffer :: numpy array of depth proportions 0-255. To calculate actual depth pass to env.calculateDepthFromBuffer()
+          segmentation :: numpy array of segmentation map   TODO: work out the range of values, i dont actually use this anywhere yet
+        """
+        viewMatrix = self.robotGetCameraViewMatrix()
 
         width, height, rgbPixels, depthPixels, segmentationBuffer = p.getCameraImage(self.imgSize, self.imgSize, viewMatrix, self.projectionMatrix)
         rgb = np.array(rgbPixels).reshape((width, height, 4)).astype(np.uint8)
@@ -262,7 +266,7 @@ class FrankaArmEnvironment:
         array of the same size, with values which store the actual depth values
         calculated from camera calibration
         """
-        depthBuffer = depthBuffer.astype(np.float32) * 1.0 / 255.0
+        depthBuffer = depthBuffer.astype(np.float64) * 1.0 / 255.0
         depth = self.farplane * self.nearplane / (self.farplane - (self.farplane - self.nearplane) * depthBuffer)
         return depth
     
