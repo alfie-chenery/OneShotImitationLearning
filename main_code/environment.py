@@ -6,6 +6,7 @@ from datetime import datetime
 from scipy.spatial.transform import Rotation
 from PIL import Image
 from math import tan, radians
+import pickle
     
 
 class FrankaArmEnvironment:
@@ -33,6 +34,7 @@ class FrankaArmEnvironment:
         #self.objectId = p.loadURDF("urdf/mug.urdf", [0.63, 0.05, 0.45], [0.0, 0.0, 0.0, 1.0])
         self.objectId = p.loadURDF("lego/lego.urdf", [0.5, 0.05, 0.45], [0,0,0,1]) #p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
         self.debugLines = [[-1,(1,0,0),[1,0,0]], [-1,(0,1,0),[0,1,0]], [-1,(0,0,1),[0,0,1]]]  #list of [id, vector, colour]
+        self.debugLines2electricboogaloo = []
 
         self.numAllJoints = p.getNumJoints(self.robotId)
         self.eefId = self.numAllJoints - 1
@@ -56,10 +58,10 @@ class FrankaArmEnvironment:
         self.useNullSpace = True
 
         self.imgSize = 1024
-        self.fov = 60 #degrees?
-        self.aspect = 1.0     # leave as 1 for square image
-        self.nearplane = 0.01 # wtf are these units? gotta figure that out
-        self.farplane = 100
+        self.fov = 60
+        self.aspect = 1.0
+        self.nearplane = 0.01
+        self.farplane = 10
         self.projectionMatrix = p.computeProjectionMatrixFOV(self.fov, self.aspect, self.nearplane, self.farplane)
         self.focalLength = self.imgSize / (2 * tan(radians(self.fov) / 2))
         self.principalPoint = (self.imgSize / 2, self.imgSize / 2) #principal point in center of image
@@ -233,9 +235,8 @@ class FrankaArmEnvironment:
         width, height, rgbPixels, depthPixels, segmentationBuffer = p.getCameraImage(self.imgSize, self.imgSize, viewMatrix, self.projectionMatrix)
         rgb = np.array(rgbPixels).reshape((width, height, 4)).astype(np.uint8)
         depthBuffer = np.array(depthPixels).reshape((width, height))
-        depthBuffer = (depthBuffer * 255).astype(np.uint8)
         segmentation = np.array(segmentationBuffer).reshape((width, height))
-        segmentation = segmentation * 1.0 / 255.0
+        #segmentation = segmentation * 1.0 / 255.0
         
         return (width, height, rgb, depthBuffer, segmentation)
 
@@ -252,25 +253,24 @@ class FrankaArmEnvironment:
 
         rgbImg = Image.fromarray(rgb)
         rgbImg = rgbImg.convert("RGB") #RGB, no alpha channel
-
-        depthImg = Image.fromarray(depthBuffer)
-        depthImg = depthImg.convert("L") #Luminosity (single greyscale channel) no alpha
-
         rgbImg.save(f"{path}\\{filename}-rgb.jpg")
-        depthImg.save(f"{path}\\{filename}-depth.jpg")
+
+        with open(f"{path}\\{filename}-depth.pkl", 'wb') as f:
+            pickle.dump(depthBuffer, f)
 
     
+    #NOT NEEDED?
     def calculateDepthFromBuffer(self, depthBuffer):
         """
         Convert depth buffer (a 2d numpy array of image values 0-255) to an
         array of the same size, with values which store the actual depth values
         calculated from camera calibration
         """
-        depthBuffer = depthBuffer.astype(np.float64) * 1.0 / 255.0
+        depthBuffer = depthBuffer.astype(np.float64)
         depth = self.farplane * self.nearplane / (self.farplane - (self.farplane - self.nearplane) * depthBuffer)
         return depth
     
-
+    #NOT NEEDED?
     def pixelsToMetres(self, pixels):
         """
         Convert distance measured in pixels of images to distance in metres
@@ -328,6 +328,11 @@ class FrankaArmEnvironment:
             stop = start + 0.2 * lineVector
 
             line[0] = p.addUserDebugLine(start, stop, line[2], replaceItemUniqueId=line[0])
+
+        for point in  self.debugLines2electricboogaloo:
+            lineVector = np.array([0,0,1])
+            end = point + 69 * lineVector
+            p.addUserDebugLine(point, end, [1,0,1])
 
 
 

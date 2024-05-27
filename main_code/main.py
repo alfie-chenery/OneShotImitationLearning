@@ -101,20 +101,18 @@ def find_transformation(P, Q):
     return R, t
 
 
-def convert_to_world_coords(points, depth_path, viewMatrix):
+def convert_to_world_coords(points, depth_map, viewMatrix):
     """
-    Takes in a list of (x,y) keypoints as pixel locations found from the image, and path to the depth image
+    Takes in a list of (x,y) keypoints as pixel locations found from the image, and depth array
     Returns numpy array of shape (N,3). Rows of (X,Y,Z) keypoints in world coordinates
     """
-    #TODO can i do this with cv2 and then not need PIL as a dependency???
-    depthImg = Image.open(depth_path)
-    depth = env.calculateDepthFromBuffer(np.array(depthImg))
+    depth = depth_map
     h, w = depth.shape
     out = []
 
     projectionMatrix = np.array(env.projectionMatrix).reshape((4,4), order='F')
     viewMatrix = np.array(viewMatrix).reshape((4,4), order='F')
-    pixel2World = np.linalg.inv(projectionMatrix @ viewMatrix)
+    pixel2World = np.linalg.inv(np.matmul(projectionMatrix, viewMatrix))
 
     #TODO: comment this. Its like converting to NDC pos. Should write about all this in the report
 
@@ -123,7 +121,7 @@ def convert_to_world_coords(points, depth_path, viewMatrix):
         Y = -(2*y - h)/h
         Z = 2*depth[y,x] - 1
         pixPos = np.array([X, Y, Z, 1], dtype=np.float64)          #homogoneous coordinates
-        position = pixel2World @ pixPos
+        position = np.matmul(pixel2World, pixPos)
         position = position / position[3]
 
         out.append(position.tolist()[:3])
@@ -182,7 +180,7 @@ def extract_corresponding_keypoints(img_live, img_init, displayMatches=True):
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f"Device: {device}")
 
-env = environment.FrankaArmEnvironment(videoLogging=True, out_dir=dir_path+"\\out")
+env = environment.FrankaArmEnvironment(videoLogging=False, out_dir=dir_path+"\\out")
 
 keypointExtracter = cv2.ORB_create(10000, fastThreshold=0)
 #keypointExtracter = cv2.SIFT_create()
@@ -220,12 +218,13 @@ ERR_THRESHOLD = 0.001 #generic error between the two sets of points
 error = ERR_THRESHOLD + 1 #TESTING -1 TO SKIP THIS ALIGNMENT, MAKE + 1 TO ACTUALLY WORK     <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 while error > ERR_THRESHOLD:
     #save live image to temp folder
+    _,_,rgb,depth,seg = env.robotGetCameraSnapshot()
     env.robotSaveCameraSnapshot("live", dir_path + "\\temp")
         
     img_live_rgb = cv2.imread(path_live_rgb, cv2.IMREAD_GRAYSCALE)
     
     try:
-        points_live, points_init = extract_corresponding_keypoints(img_live_rgb, img_init_rgb)
+        #points_live, points_init = extract_corresponding_keypoints(img_live_rgb, img_init_rgb)
 
         #TESTING
         # points_init = [(10, 445),(140, 445),(10, 574),(140, 574)]
@@ -236,10 +235,15 @@ while error > ERR_THRESHOLD:
         #TODO: the view matrix needs to be the one when the picture was taken, this is a new thing we need to save.
         # Should not be the current one
 
-        points_live = convert_to_world_coords(points_live, path_live_depth, env.robotGetCameraViewMatrix())
-        points_init = convert_to_world_coords(points_init, path_init_depth, initView)
+        points_live = convert_to_world_coords(points_live, depth, env.robotGetCameraViewMatrix())
+        #points_init = convert_to_world_coords(points_init, path_init_depth, initView)
+        env.debugLines2electricboogaloo = points_live
+        env.drawDebugLines()
         print(points_live)
-        print(points_init)
+        #print(points_init)
+
+        while True:
+            env.stepEnv()
 
         #the points should have the same z lets be real, making it so makes it much better 
         # ditch saving images and just pass np arrays around. Hopefully that improves z accuracy
