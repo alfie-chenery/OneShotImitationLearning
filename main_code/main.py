@@ -55,14 +55,14 @@ def loadEmbeddings():
 def find_transformation(P, Q):
     """
     Find transformation given two sets of correspondences between 3D points
-    The transformation maps Q onto P (as close as possible)
+    The transformation maps P onto Q (as close as possible)
     """
     assert P.shape == Q.shape
     n, m = P.shape
 
     centroidP = np.mean(P, axis=0)
     centroidQ = np.mean(Q, axis=0)
-    varianceP = np.var(P, axis=0)
+    varianceQ = np.var(Q, axis=0)
 
     #Subtract centroids to obtain centered sets of points
     Pcentered = P - centroidP
@@ -84,16 +84,19 @@ def find_transformation(P, Q):
     #if the rotation is the wrong way just transpose it lol
 
     #Compute scale factor
-    c = varianceP / np.trace(np.diag(E) @ S)
-    print(c)
+    c = varianceQ / np.trace(np.diag(E) @ S) #maybe need to use var P instead?
+    #print(c)
 
     #Compute translation vector
     #t = centroidQ - np.dot(R, centroidP)
-    #t = centroidP - R @ centroidQ
+    #t = centroidP - c * R @ centroidQ
     t = centroidQ - R @ centroidP
 
+    # t[0] -= 0.15
+    # t[1] += 0.05
+    # t[2] = -0.05
 
-    Q_prime = np.array([t + c * R @ p for p in P])
+    #P_prime = np.array([t + c * R @ q for q in Q])
 
     return R, t
 
@@ -113,25 +116,25 @@ def convert_to_world_coords(points, depth_path, viewMatrix):
     viewMatrix = np.array(viewMatrix).reshape((4,4), order='F')
     pixel2World = np.linalg.inv(projectionMatrix @ viewMatrix)
 
+    #TODO: comment this. Its like converting to NDC pos. Should write about all this in the report
+
     for (x,y) in points:
         X = (2*x - w)/w
         Y = -(2*y - h)/h
         Z = 2*depth[y,x] - 1
-        pixPos = np.asarray([X, Y, Z, 1])          #homogoneous coordinates
+        pixPos = np.array([X, Y, Z, 1], dtype=np.float64)          #homogoneous coordinates
         position = pixel2World @ pixPos
         position = position / position[3]
 
         out.append(position.tolist()[:3])
 
-    return np.array(out)    
+    return np.array(out, dtype=np.float64)  
+
     
 
 
 def compute_error(points1, points2):    
-    np1 = np.array(points1)
-    np2 = np.array(points2)
-
-    distances = np.linalg.norm(np1 - np2, axis=1)
+    distances = np.linalg.norm(points1 - points2, axis=1)
     return np.mean(distances)
     #We cant be certain how many keypoint matches we get from the GMS matching. Therefore,
     # to be fair we should normalise by the number of matches. Ie mean instead of sum
@@ -152,8 +155,9 @@ def extract_corresponding_keypoints(img_live, img_init, displayMatches=True):
     #TODO remove any matches which match between different objects using segmentation map
 
     # GMS (Grid-based Motion Statistics) algorithm refines the guesses for high quality matches
-    matchesGMS = cv2.xfeatures2d.matchGMS(img_live.shape[:2], img_init.shape[:2], kp_live, kp_init, matches, withRotation=True, withScale=True)
-    
+    #matchesGMS = cv2.xfeatures2d.matchGMS(img_live.shape[:2], img_init.shape[:2], kp_live, kp_init, matches, withRotation=True, withScale=True)
+    matchesGMS = matches
+
     matchesGMS = sorted(matchesGMS, key=lambda x:x.distance)
     matchesGMS = matchesGMS[:50]
 
@@ -178,10 +182,14 @@ def extract_corresponding_keypoints(img_live, img_init, displayMatches=True):
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f"Device: {device}")
 
-env = environment.FrankaArmEnvironment()
+env = environment.FrankaArmEnvironment(videoLogging=True, out_dir=dir_path+"\\out")
 
 keypointExtracter = cv2.ORB_create(10000, fastThreshold=0)
+#keypointExtracter = cv2.SIFT_create()
 keypointMatcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+#keypointMatcher = cv2.BFMatcher()
+
+
 
 plt.ion()
 
@@ -224,16 +232,24 @@ while error > ERR_THRESHOLD:
         # points_live = [(421, 650),(551, 650),(421, 779),(551, 779)]
         points_init = [(11, 446),(139, 446),(10, 573),(139, 573)]
         points_live = [(422, 651),(550, 651),(422, 778),(550, 778)]
-        
-        #Given the pixel coordinates of the correspondences, add the depth channel
-        camTranslation, camRotation = env.robotGetEefPosition()
-        camRotation = env.getMatrixFromQuaternion(camRotation)
 
         #TODO: the view matrix needs to be the one when the picture was taken, this is a new thing we need to save.
         # Should not be the current one
 
         points_live = convert_to_world_coords(points_live, path_live_depth, env.robotGetCameraViewMatrix())
         points_init = convert_to_world_coords(points_init, path_init_depth, initView)
+        print(points_live)
+        print(points_init)
+
+        #the points should have the same z lets be real, making it so makes it much better 
+        # ditch saving images and just pass np arrays around. Hopefully that improves z accuracy
+        z = points_live[0,2]
+        points_live[:, 2] = z
+        print(points_live)
+        z = points_init[0,2]
+        points_init[:, 2] = z
+        print(points_init)
+
         R, t = find_transformation(points_live, points_init)
 
         #TESTING
@@ -250,7 +266,6 @@ while error > ERR_THRESHOLD:
 
         env.robotMoveEefPosition(t,R)
         
-
     except NoKeypointsException as e:
         print(e)
         env.robotSetJointAngles(env.restPoses)
