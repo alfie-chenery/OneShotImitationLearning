@@ -25,9 +25,7 @@ image_transforms = T.Compose([
     T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
 ])
 
-def embedImage(path):
-    print(path)
-    img = Image.open(path)
+def embedImage(img):
     img = image_transforms(img)
     img = img.unsqueeze(0)
     emb = dino(img)
@@ -42,7 +40,8 @@ def loadEmbeddings():
     i = 0
     for path in glob.glob(dir_path + "\\demonstrations\\*-rgb.jpg"):
         try:
-            embeddings[path.split("\\")[-1].split("-")[0]] = embedImage(path)
+            img = Image.open(path)
+            embeddings[path.split("\\")[-1].split("-")[0]] = embedImage(img)
             #path name shouldnt have a - in it (apart from the one at the end) otherwise itll break. maybe fix that
             i += 1
         except:
@@ -50,6 +49,23 @@ def loadEmbeddings():
 
     print(f"Successfully loaded {i} images")
     return embeddings
+
+
+def loadDemo(name):
+    rgbPath = dir_path + f"\\demonstrations\\{name}-rgb.jpg"
+    depthPath = dir_path + f"\\demonstrations\\{name}-depth.pkl"
+    vmPath = dir_path + f"\\demonstrations\\{name}-vm.pkl"
+    tracePath = dir_path + f"\\demonstrations\\{name}.pkl"
+
+    rgb = cv2.imread(rgbPath, cv2.IMREAD_GRAYSCALE)
+    with open(depthPath, 'rb') as f:
+        depth = pickle.load(f)
+    with open(vmPath, 'rb') as f:
+        vm = pickle.load(f)
+    with open(tracePath, 'rb') as f:
+        trace = pickle.load(f) 
+
+    return (rgb, depth, vm, trace)
 
 
 def find_transformation(P, Q):
@@ -191,12 +207,9 @@ keypointMatcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
 
 plt.ion()
 
-path_live_rgb = dir_path + f"\\temp\\live-rgb.jpg"
-path_live_depth = dir_path + f"\\temp\\live-depth.jpg"
-
 #take initial screenshot
-env.robotSaveCameraSnapshot("live", dir_path + "\\temp")
-init_emb = embedImage(path_live_rgb)
+_, _, init_rgb, _, _, _ = env.robotGetCameraSnapshot()
+init_emb = embedImage(init_rgb)
 
 demo_img_emb = loadEmbeddings()
 cos_sim = torch.nn.CosineSimilarity(dim=1, eps=1e-08)
@@ -208,39 +221,32 @@ for key in demo_img_emb.keys():
 
 #load bottleneck image
 print(f"Best match found: {best[1]}")
-path_init_rgb = dir_path + f"\\demonstrations\\{best[1]}-rgb.jpg"
-path_init_depth = dir_path + f"\\demonstrations\\{best[1]}-depth.jpg"
-
-img_init_rgb = cv2.imread(path_init_rgb, cv2.IMREAD_GRAYSCALE)
-initView = env.robotGetCameraViewMatrix()
+demo_rgb, demo_depth, demo_vm, demo_trace = loadDemo(best[1])
 
 ERR_THRESHOLD = 0.001 #generic error between the two sets of points
 error = ERR_THRESHOLD + 1 #TESTING -1 TO SKIP THIS ALIGNMENT, MAKE + 1 TO ACTUALLY WORK     <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 while error > ERR_THRESHOLD:
-    #save live image to temp folder
-    _,_,rgb,depth,seg = env.robotGetCameraSnapshot()
-    env.robotSaveCameraSnapshot("live", dir_path + "\\temp")
-        
-    img_live_rgb = cv2.imread(path_live_rgb, cv2.IMREAD_GRAYSCALE)
+
+    _, _, live_rgb, live_depth, _, live_vm = env.robotGetCameraSnapshot()
     
     try:
-        #points_live, points_init = extract_corresponding_keypoints(img_live_rgb, img_init_rgb)
+        points_live, points_demo = extract_corresponding_keypoints(live_rgb, demo_rgb)
 
         #TESTING
         # points_init = [(10, 445),(140, 445),(10, 574),(140, 574)]
         # points_live = [(421, 650),(551, 650),(421, 779),(551, 779)]
-        points_init = [(11, 446),(139, 446),(10, 573),(139, 573)]
+        points_demo = [(11, 446),(139, 446),(10, 573),(139, 573)]
         points_live = [(422, 651),(550, 651),(422, 778),(550, 778)]
 
         #TODO: the view matrix needs to be the one when the picture was taken, this is a new thing we need to save.
         # Should not be the current one
 
-        points_live = convert_to_world_coords(points_live, depth, env.robotGetCameraViewMatrix())
-        #points_init = convert_to_world_coords(points_init, path_init_depth, initView)
-        env.debugLines2electricboogaloo = points_live
+        points_live = convert_to_world_coords(points_live, live_depth, live_vm)
+        points_demo = convert_to_world_coords(points_demo, demo_depth, demo_vm)
+        env.debugLines2electricboogaloo = np.concatenate((points_demo, points_live))
         env.drawDebugLines()
         print(points_live)
-        #print(points_init)
+        print(points_demo)
 
         while True:
             env.stepEnv()
@@ -292,11 +298,10 @@ print(f"Alligned offset:\n  Translation:{offset_pos},\n  Rotation (quat):{offset
 offset_ornMat = env.getMatrixFromQuaternion(offset_orn)
 
 #execute demo
-with open(dir_path + f"\\demonstrations\\{best[1]}.pkl", 'rb') as f:
-    trace = pickle.load(f) 
 
-for keyFrame in range(len(trace)):
-    demo_pos, demo_orn, demo_gripper = trace[keyFrame]
+
+for keyFrame in range(len(demo_trace)):
+    demo_pos, demo_orn, demo_gripper = demo_trace[keyFrame]
     desired_pos, desired_orn = env.offsetMovementLocal(demo_pos, demo_orn, offset_pos, offset_ornMat)
 
     env.robotSetEefPosition(desired_pos, desired_orn, interpolationSteps=250)

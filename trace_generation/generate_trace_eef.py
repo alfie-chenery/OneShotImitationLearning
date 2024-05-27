@@ -15,7 +15,7 @@ def main():
     gripperClosed = True
     trace = [(*env.robotGetEefPosition(), gripperClosed)]    #The trace so far. trace[-1] is the last keyframe added
     saveTrace = True
-    _, _, rgb, depth, _ = env.robotGetCameraSnapshot()
+    _, _, rgb, depth, _, vm = env.robotGetCameraSnapshot()
     debounce = False #button debounce, prevents holding button affecting multiple times
     wireframe = False
     cameraMode = False #False to control eef pos and orn, False to control camera
@@ -43,7 +43,7 @@ def main():
             print("toggled wireframe " + ("on" if wireframe else "off"))
 
         if controller.DPadDown and not debounce:
-            _, _, rgb, depth, _ = env.robotGetCameraSnapshot()
+            _, _, rgb, depth, _, vm = env.robotGetCameraSnapshot()
             debounce = True
             print("taken snapshot")
 
@@ -106,7 +106,7 @@ def main():
         with open(path, 'wb') as f:
             pickle.dump(trace, f)
 
-        env.robotSaveCameraSnapshot("trace_snapshot", dir_path, rgb, depth)
+        env.robotSaveCameraSnapshot("trace_snapshot", dir_path, rgb, depth, vm)
         print("\nSuccessfully saved trace")
     else:
         print("\nQuit without saving trace")

@@ -238,18 +238,18 @@ class FrankaArmEnvironment:
         segmentation = np.array(segmentationBuffer).reshape((width, height))
         #segmentation = segmentation * 1.0 / 255.0
         
-        return (width, height, rgb, depthBuffer, segmentation)
+        return (width, height, rgb, depthBuffer, segmentation, viewMatrix)
 
 
-    def robotSaveCameraSnapshot(self, filename, path="", rgb=None, depthBuffer=None):
+    def robotSaveCameraSnapshot(self, filename, path="", rgb=None, depthBuffer=None, vm=None):
         """
         Filename should NOT include a file extension
         Path: Optional relative path to folder
-        Can pass rgb AND depth buffer or automatically call robotGetCameraSnapshot if not provided
-          If either is not provided, both will be overwritten with an internal call
+        Can pass rgb AND depth AND vm or automatically call robotGetCameraSnapshot if not provided
+          If any are not provided, both will be overwritten with an internal call
         """
         if (rgb is None) or (depthBuffer is None):
-            _, _, rgb, depthBuffer, _ = self.robotGetCameraSnapshot()
+            _, _, rgb, depthBuffer, _, vm = self.robotGetCameraSnapshot()
 
         rgbImg = Image.fromarray(rgb)
         rgbImg = rgbImg.convert("RGB") #RGB, no alpha channel
@@ -257,6 +257,9 @@ class FrankaArmEnvironment:
 
         with open(f"{path}\\{filename}-depth.pkl", 'wb') as f:
             pickle.dump(depthBuffer, f)
+
+        with open(f"{path}\\{filename}-vm.pkl", 'wb') as f:
+            pickle.dump(vm, f)
 
     
     #NOT NEEDED?
@@ -329,10 +332,10 @@ class FrankaArmEnvironment:
 
             line[0] = p.addUserDebugLine(start, stop, line[2], replaceItemUniqueId=line[0])
 
-        for point in  self.debugLines2electricboogaloo:
-            lineVector = np.array([0,0,1])
-            end = point + 69 * lineVector
-            p.addUserDebugLine(point, end, [1,0,1])
+        # for point in  self.debugLines2electricboogaloo:
+        #     lineVector = np.array([0,0,1])
+        #     end = point + 69 * lineVector
+        #     p.addUserDebugLine(point, end, [1,0,1])
 
 
 
