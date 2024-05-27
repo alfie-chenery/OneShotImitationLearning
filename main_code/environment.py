@@ -32,9 +32,9 @@ class FrankaArmEnvironment:
         self.robotId = p.loadURDF("franka_panda/panda.urdf", [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0], useFixedBase=True)
         self.tableId = p.loadURDF("table/table.urdf", [0.6, 0.0, -0.2], p.getQuaternionFromEuler([0.0, 0.0, np.pi/2]), useFixedBase=True)
         #self.objectId = p.loadURDF("urdf/mug.urdf", [0.63, 0.05, 0.45], [0.0, 0.0, 0.0, 1.0])
-        self.objectId = p.loadURDF("lego/lego.urdf", [0.5, 0.05, 0.45], [0,0,0,1]) #p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
-        self.debugLines = [[-1,(1,0,0),[1,0,0]], [-1,(0,1,0),[0,1,0]], [-1,(0,0,1),[0,0,1]]]  #list of [id, vector, colour]
-        self.debugLines2electricboogaloo = []
+        self.objectId = p.loadURDF("lego/lego.urdf", [0.5, 0.05, 0.45], p.getQuaternionFromEuler([0.0, 0.0, 0.0]))
+        self.eefDebugLines = [[-1,(1,0,0),[1,0,0]], [-1,(0,1,0),[0,1,0]], [-1,(0,0,1),[0,0,1]]]  # lines relative to  pos (draw basis vectors)
+        self.debugLines = [] #list of [id, pos, dir, colour]
 
         self.numAllJoints = p.getNumJoints(self.robotId)
         self.eefId = self.numAllJoints - 1
@@ -52,7 +52,6 @@ class FrankaArmEnvironment:
             self.upperLimits.append(jointInfo[9])
             self.jointRanges.append(jointInfo[9] - jointInfo[8])
             p.resetJointState(self.robotId, i, self.restPoses[i])
-        self.restPos, self.restOrn = self.robotGetEefPosition()
         self.gripperClosed = True
 
         self.useNullSpace = True
@@ -71,6 +70,8 @@ class FrankaArmEnvironment:
         #Let the environment come to rest before starting
         for _ in range(250):
             self.stepEnv()
+
+        self.restPos, self.restOrn = self.robotGetEefPosition()
 
 
     def stepEnv(self):
@@ -176,7 +177,7 @@ class FrankaArmEnvironment:
         newOrn = currentOrn @ localRotation
         newOrn = self.getQuaternionFromMatrix(newOrn)
 
-        newPos = [p + t for (p,t) in zip(pos, translation)]
+        newPos = (np.array(pos) + translation).tolist()
 
         #pos = pos + orn.translation
         # this should make the translation be in eef space not global.
@@ -260,27 +261,6 @@ class FrankaArmEnvironment:
 
         with open(f"{path}\\{filename}-vm.pkl", 'wb') as f:
             pickle.dump(vm, f)
-
-    
-    #NOT NEEDED?
-    def calculateDepthFromBuffer(self, depthBuffer):
-        """
-        Convert depth buffer (a 2d numpy array of image values 0-255) to an
-        array of the same size, with values which store the actual depth values
-        calculated from camera calibration
-        """
-        depthBuffer = depthBuffer.astype(np.float64)
-        depth = self.farplane * self.nearplane / (self.farplane - (self.farplane - self.nearplane) * depthBuffer)
-        return depth
-    
-    #NOT NEEDED?
-    def pixelsToMetres(self, pixels):
-        """
-        Convert distance measured in pixels of images to distance in metres
-        based on the calibration of the camera pixel density
-        """
-        #Some sources say 1 pixel is 1mm always in pybullet. Seems very incorrect
-        return pixels * 0.001
     
 
     def getQuaternionFromEuler(self, e):
@@ -316,7 +296,10 @@ class FrankaArmEnvironment:
     def setDebugCameraState(self, cameraDist, cameraYaw, cameraPitch, cameraTarget=[0,0,0]):
         p.resetDebugVisualizerCamera(cameraDist, cameraYaw, cameraPitch, cameraTarget)
 
-    
+
+    def addDebugLine(self, pos, direction, colour):
+        self.debugLines.append([-1, pos, direction, colour])
+
     def drawDebugLines(self):
         """
         Draws the lines specified in self.debugLines
@@ -326,16 +309,18 @@ class FrankaArmEnvironment:
         start, orn = self.robotGetEefPosition()
         rotationMatrix = self.getMatrixFromQuaternion(orn)
 
-        for line in self.debugLines:
-            lineVector = rotationMatrix.dot(line[1])
+        for line in self.eefDebugLines:
+            lineId, direction, colour = line
+            lineVector = rotationMatrix.dot(direction)
             stop = start + 0.2 * lineVector
 
-            line[0] = p.addUserDebugLine(start, stop, line[2], replaceItemUniqueId=line[0])
+            line[0] = p.addUserDebugLine(start, stop, colour, replaceItemUniqueId=lineId)
 
-        # for point in  self.debugLines2electricboogaloo:
-        #     lineVector = np.array([0,0,1])
-        #     end = point + 69 * lineVector
-        #     p.addUserDebugLine(point, end, [1,0,1])
+        for line in self.debugLines:
+            lineId, start, direction, colour = line
+            end = start + 0.05 * np.array(direction)
+
+            line[0] = p.addUserDebugLine(start, end, colour, replaceItemUniqueId=lineId)
 
 
 

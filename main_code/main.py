@@ -25,7 +25,8 @@ image_transforms = T.Compose([
     T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
 ])
 
-def embedImage(img):
+def embedImage(path):
+    img = Image.open(path)
     img = image_transforms(img)
     img = img.unsqueeze(0)
     emb = dino(img)
@@ -40,8 +41,7 @@ def loadEmbeddings():
     i = 0
     for path in glob.glob(dir_path + "\\demonstrations\\*-rgb.jpg"):
         try:
-            img = Image.open(path)
-            embeddings[path.split("\\")[-1].split("-")[0]] = embedImage(img)
+            embeddings[path.split("\\")[-1].split("-")[0]] = embedImage(path)
             #path name shouldnt have a - in it (apart from the one at the end) otherwise itll break. maybe fix that
             i += 1
         except:
@@ -100,17 +100,13 @@ def find_transformation(P, Q):
     #if the rotation is the wrong way just transpose it lol
 
     #Compute scale factor
-    c = varianceQ / np.trace(np.diag(E) @ S) #maybe need to use var P instead?
+    #c = varianceQ / np.trace(np.diag(E) @ S) #maybe need to use var P instead?
     #print(c)
 
     #Compute translation vector
     #t = centroidQ - np.dot(R, centroidP)
     #t = centroidP - c * R @ centroidQ
-    t = centroidQ - R @ centroidP
-
-    # t[0] -= 0.15
-    # t[1] += 0.05
-    # t[2] = -0.05
+    t = centroidP - R @ centroidQ
 
     #P_prime = np.array([t + c * R @ q for q in Q])
 
@@ -135,7 +131,7 @@ def convert_to_world_coords(points, depth_map, viewMatrix):
     for (x,y) in points:
         X = (2*x - w)/w
         Y = -(2*y - h)/h
-        Z = 2*depth[y,x] - 1
+        Z = 2*depth[int(y), int(x)] - 1
         pixPos = np.array([X, Y, Z, 1], dtype=np.float64)          #homogoneous coordinates
         position = np.matmul(pixel2World, pixPos)
         position = position / position[3]
@@ -208,8 +204,8 @@ keypointMatcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
 plt.ion()
 
 #take initial screenshot
-_, _, init_rgb, _, _, _ = env.robotGetCameraSnapshot()
-init_emb = embedImage(init_rgb)
+env.robotSaveCameraSnapshot("init", dir_path + "\\temp")
+init_emb = embedImage(dir_path + "\\temp\\init-rgb.jpg")
 
 demo_img_emb = loadEmbeddings()
 cos_sim = torch.nn.CosineSimilarity(dim=1, eps=1e-08)
@@ -223,8 +219,8 @@ for key in demo_img_emb.keys():
 print(f"Best match found: {best[1]}")
 demo_rgb, demo_depth, demo_vm, demo_trace = loadDemo(best[1])
 
-ERR_THRESHOLD = 0.001 #generic error between the two sets of points
-error = ERR_THRESHOLD + 1 #TESTING -1 TO SKIP THIS ALIGNMENT, MAKE + 1 TO ACTUALLY WORK     <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+ERR_THRESHOLD = 0.2 #average error between sets of points (meters)
+error = ERR_THRESHOLD + 1
 while error > ERR_THRESHOLD:
 
     _, _, live_rgb, live_depth, _, live_vm = env.robotGetCameraSnapshot()
@@ -233,41 +229,34 @@ while error > ERR_THRESHOLD:
         points_live, points_demo = extract_corresponding_keypoints(live_rgb, demo_rgb)
 
         #TESTING
-        # points_init = [(10, 445),(140, 445),(10, 574),(140, 574)]
-        # points_live = [(421, 650),(551, 650),(421, 779),(551, 779)]
-        points_demo = [(11, 446),(139, 446),(10, 573),(139, 573)]
-        points_live = [(422, 651),(550, 651),(422, 778),(550, 778)]
+        points_demo = [(10, 445),(140, 445),(10, 574),(140, 574)]
+        points_live = [(421, 650),(551, 650),(421, 779),(551, 779)] #0.5, 0.05 unrotated
+        #points_live = [(401, 738), (462, 629), (508, 800), (570, 693)] #0.5, 0.05, rotated pi/3
 
         #TODO: the view matrix needs to be the one when the picture was taken, this is a new thing we need to save.
         # Should not be the current one
 
         points_live = convert_to_world_coords(points_live, live_depth, live_vm)
         points_demo = convert_to_world_coords(points_demo, demo_depth, demo_vm)
-        env.debugLines2electricboogaloo = np.concatenate((points_demo, points_live))
+        for i in range(len(points_live)):
+            pos = points_live[i]
+            env.addDebugLine(pos, (0,0,1), [1,0,1])
+        for i in range(len(points_demo)):
+            pos = points_demo[i]
+            env.addDebugLine(pos, (0,0,1), [0,1,1])
+
         env.drawDebugLines()
         print(points_live)
         print(points_demo)
 
-        while True:
-            env.stepEnv()
-
-        #the points should have the same z lets be real, making it so makes it much better 
-        # ditch saving images and just pass np arrays around. Hopefully that improves z accuracy
-        z = points_live[0,2]
-        points_live[:, 2] = z
-        print(points_live)
-        z = points_init[0,2]
-        points_init[:, 2] = z
-        print(points_init)
-
-        R, t = find_transformation(points_live, points_init)
+        R, t = find_transformation(points_live, points_demo)
 
         #TESTING
         #R = np.identity(3)
 
         print(f"Incremental Update:\n  Translation:{t},\n  Rotation (Matrix):\n{R}\n  Rotation (euler):{env.getEulerFromMatrix(R)}\n")
 
-        error = compute_error(points_live, points_init)
+        error = compute_error(points_live, points_demo)
         print(f"Error: {error}")
 
         # After finding keypoints, wait so we can check the correspondence image
@@ -289,13 +278,22 @@ while error > ERR_THRESHOLD:
 
 plt.close()
 
+for i in range(50):
+    env.stepEnv()
+
 #We are alligned, calculate the offset to apply to demo keyframes
-alligned_pos, alligned_orn = env.robotGetEefPosition()
+# alligned_pos, alligned_orn = env.robotGetEefPosition()
+# offset_pos, offset_orn = env.calculateOffset(env.restPos, env.restOrn, alligned_pos, alligned_orn)
+# offset_ornMat = env.getMatrixFromQuaternion(offset_orn)
 
-offset_pos, offset_orn = env.calculateOffset(env.restPos, env.restOrn, alligned_pos, alligned_orn)
-print(f"Alligned offset:\n  Translation:{offset_pos},\n  Rotation (quat):{offset_orn},\n  Rotation (euler):{env.getEulerFromQuaternion(offset_orn)}\n")
+offset_pos = t
+offset_ornMat = R
 
-offset_ornMat = env.getMatrixFromQuaternion(offset_orn)
+print(f"Alligned offset:\n  Translation:{offset_pos},\n  Rotation (matrix):{offset_ornMat}\n")
+
+
+
+
 
 #execute demo
 
