@@ -32,7 +32,7 @@ class FrankaArmEnvironment:
         self.robotId = p.loadURDF("franka_panda/panda.urdf", [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0], useFixedBase=True)
         self.tableId = p.loadURDF("table/table.urdf", [0.6, 0.0, -0.2], p.getQuaternionFromEuler([0.0, 0.0, np.pi/2]), useFixedBase=True)
         #self.objectId = p.loadURDF("urdf/mug.urdf", [0.63, 0.05, 0.45], [0.0, 0.0, 0.0, 1.0])
-        self.objectId = p.loadURDF("lego/lego.urdf", [0.5, 0.05, 0.45], p.getQuaternionFromEuler([0.0, 0.0, 0.0]))
+        self.objectId = p.loadURDF("lego/lego.urdf", [0.5, 0.05, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
         self.eefDebugLines = [[-1,(1,0,0),[1,0,0]], [-1,(0,1,0),[0,1,0]], [-1,(0,0,1),[0,0,1]]]  # lines relative to  pos (draw basis vectors)
         self.debugLines = [] #list of [id, pos, dir, colour]
 
@@ -177,7 +177,7 @@ class FrankaArmEnvironment:
         newOrn = currentOrn @ localRotation
         newOrn = self.getQuaternionFromMatrix(newOrn)
 
-        newPos = (np.array(pos) + translation).tolist()
+        newPos = (np.array(pos) + np.array(translation)).tolist()
 
         #pos = pos + orn.translation
         # this should make the translation be in eef space not global.
@@ -306,18 +306,20 @@ class FrankaArmEnvironment:
         Each line is of the form [id, vector, colour]
         where vector is relative to the robots eef and colour is a list [R,G,B] with values 0..1
         """
-        start, orn = self.robotGetEefPosition()
+        pos, orn = self.robotGetEefPosition()
         rotationMatrix = self.getMatrixFromQuaternion(orn)
 
         for line in self.eefDebugLines:
             lineId, direction, colour = line
             lineVector = rotationMatrix.dot(direction)
-            stop = start + 0.2 * lineVector
+            stop = pos + 0.2 * lineVector
 
-            line[0] = p.addUserDebugLine(start, stop, colour, replaceItemUniqueId=lineId)
+            line[0] = p.addUserDebugLine(pos, stop, colour, replaceItemUniqueId=lineId)
 
         for line in self.debugLines:
             lineId, start, direction, colour = line
+            #start = start + np.array(pos) - np.array(self.restPos)
+            #TODO: maybe make it so blue lines move with eef until they overlap pink
             end = start + 0.05 * np.array(direction)
 
             line[0] = p.addUserDebugLine(start, end, colour, replaceItemUniqueId=lineId)

@@ -95,7 +95,8 @@ def find_transformation(P, Q):
 
     #Compute rotation matrix
     #R = Vt.T @ S @ U
-    R = U @ S @ Vt
+    R = Vt.T @ S @ U.T
+    R = R.T
     
     #if the rotation is the wrong way just transpose it lol
 
@@ -106,7 +107,7 @@ def find_transformation(P, Q):
     #Compute translation vector
     #t = centroidQ - np.dot(R, centroidP)
     #t = centroidP - c * R @ centroidQ
-    t = centroidP - R @ centroidQ
+    t = centroidP - centroidQ
 
     #P_prime = np.array([t + c * R @ q for q in Q])
 
@@ -165,14 +166,18 @@ def extract_corresponding_keypoints(img_live, img_init, displayMatches=True):
     #TODO remove any matches which match between different objects using segmentation map
 
     # GMS (Grid-based Motion Statistics) algorithm refines the guesses for high quality matches
-    #matchesGMS = cv2.xfeatures2d.matchGMS(img_live.shape[:2], img_init.shape[:2], kp_live, kp_init, matches, withRotation=True, withScale=True)
-    matchesGMS = matches
+    matchesGMS = cv2.xfeatures2d.matchGMS(img_live.shape[:2], img_init.shape[:2], kp_live, kp_init, matches, withRotation=True, withScale=False)
+    #matchesGMS = matches
 
     matchesGMS = sorted(matchesGMS, key=lambda x:x.distance)
-    matchesGMS = matchesGMS[:50]
+    #matchesGMS = matchesGMS[:500]
+
+    if len(matchesGMS) == 0:
+        raise NoKeypointsException("Could not match any keypoints")
 
     if displayMatches:
         matchImg = cv2.drawMatches(img_live, kp_live, img_init, kp_init, matchesGMS, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+        plt.figure(figsize = (12,8))
         plt.imshow(matchImg)
         plt.pause(0.01)
 
@@ -219,9 +224,10 @@ for key in demo_img_emb.keys():
 print(f"Best match found: {best[1]}")
 demo_rgb, demo_depth, demo_vm, demo_trace = loadDemo(best[1])
 
+iter = 0
 ERR_THRESHOLD = 0.2 #average error between sets of points (meters)
 error = ERR_THRESHOLD + 1
-while error > ERR_THRESHOLD:
+while error > ERR_THRESHOLD: # or iter < 2:
 
     _, _, live_rgb, live_depth, _, live_vm = env.robotGetCameraSnapshot()
     
@@ -229,9 +235,9 @@ while error > ERR_THRESHOLD:
         points_live, points_demo = extract_corresponding_keypoints(live_rgb, demo_rgb)
 
         #TESTING
-        points_demo = [(10, 445),(140, 445),(10, 574),(140, 574)]
-        points_live = [(421, 650),(551, 650),(421, 779),(551, 779)] #0.5, 0.05 unrotated
-        #points_live = [(401, 738), (462, 629), (508, 800), (570, 693)] #0.5, 0.05, rotated pi/3
+        # points_demo = [(10, 445),(140, 445),(10, 574),(140, 574)]
+        # points_live = [(421, 650),(551, 650),(421, 779),(551, 779)] #0.5, 0.05 unrotated
+        #points_live = [(401, 738),(462, 629), (508, 800), (570, 693)] #0.5, 0.05, rotated pi/3
 
         #TODO: the view matrix needs to be the one when the picture was taken, this is a new thing we need to save.
         # Should not be the current one
@@ -244,15 +250,13 @@ while error > ERR_THRESHOLD:
         for i in range(len(points_demo)):
             pos = points_demo[i]
             env.addDebugLine(pos, (0,0,1), [0,1,1])
-
         env.drawDebugLines()
+
         print(points_live)
         print(points_demo)
 
-        R, t = find_transformation(points_live, points_demo)
 
-        #TESTING
-        #R = np.identity(3)
+        R, t = find_transformation(points_live, points_demo)
 
         print(f"Incremental Update:\n  Translation:{t},\n  Rotation (Matrix):\n{R}\n  Rotation (euler):{env.getEulerFromMatrix(R)}\n")
 
@@ -268,12 +272,13 @@ while error > ERR_THRESHOLD:
     except NoKeypointsException as e:
         print(e)
         env.robotSetJointAngles(env.restPoses)
-        # randomTranslation = np.append(np.random.uniform(-0.2, 0.2, 2), 0).tolist()
-        # env.robotMoveEefPosition(randomTranslation, np.identity(3))
+        randomTranslation = np.append(np.random.uniform(-0.2, 0.2, 2), 0).tolist()
+        env.robotMoveEefPosition(randomTranslation, np.identity(3))
         continue
 
+    iter += 1
     #TESTING
-    break
+    # break
 
 
 plt.close()
@@ -289,7 +294,7 @@ for i in range(50):
 offset_pos = t
 offset_ornMat = R
 
-print(f"Alligned offset:\n  Translation:{offset_pos},\n  Rotation (matrix):{offset_ornMat}\n")
+print(f"Alligned offset:\n  Translation:{offset_pos},\n  Rotation (matrix):\n{offset_ornMat}\n Rotation (euler):{env.getEulerFromMatrix(offset_ornMat)}\n")
 
 
 
