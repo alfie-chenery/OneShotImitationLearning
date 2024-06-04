@@ -86,12 +86,12 @@ def main():
         if controller.nonePressed(): #once button released, disable debounce, allowing a new button to be registered
             debounce = False
 
-        if controller.Start: #quit without saving
-            saveTrace = False
+        if controller.Start: #save and quit
+            saveTrace = True
             break
 
-        if controller.Menu: #save and quit
-            saveTrace = True
+        if controller.Back: #quit without saving
+            saveTrace = False
             break            
 
         env.stepEnv()
@@ -102,11 +102,11 @@ def main():
     
     if saveTrace:
         dir_path = os.path.dirname(os.path.abspath(__file__))
-        path = os.path.join(dir_path, "trace.pkl")
+        path = os.path.join(dir_path, "demonstration.pkl")
         with open(path, 'wb') as f:
             pickle.dump(trace, f)
 
-        env.robotSaveCameraSnapshot("trace_snapshot", dir_path, rgb, depth, vm)
+        env.robotSaveCameraSnapshot("demonstration", dir_path, rgb, depth, vm)
         print("\nSuccessfully saved trace")
     else:
         print("\nQuit without saving trace")

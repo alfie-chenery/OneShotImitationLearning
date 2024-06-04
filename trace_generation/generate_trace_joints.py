@@ -1,3 +1,10 @@
+#+=============================================================================+
+#| This file is deprecated!                                                    |
+#| main.py no longer supports demonstrations saved in this format.             |
+#| Use generate_trace_eef.py instead. This file remains only for documentation |
+#+=============================================================================+
+
+
 import pybullet as p
 import environment
 import pickle

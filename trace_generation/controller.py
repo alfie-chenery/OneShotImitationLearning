@@ -34,7 +34,7 @@ class Controller():
         self.DPadDown = 0        
 
         self.Start = 0 
-        self.Menu = 0
+        self.Back = 0
 
         self._monitor_thread = threading.Thread(target=self._monitor_controller, args=())
         self._monitor_thread.daemon = True
@@ -61,7 +61,7 @@ class Controller():
                 self.DPadUp,
                 self.DPadDown,
                 self.Start,
-                self.Menu]
+                self.Back]
     
 
     def nonePressed(self):
@@ -117,10 +117,10 @@ class Controller():
                     self.DPadUp = int(event.state == -1)
                     self.DPadDown = int(event.state == 1)
 
-                elif event.code == 'BTN_START':
-                    self.Start = event.state
                 elif event.code == 'BTN_SELECT':
-                    self.Menu = event.state
+                    self.Start = event.state
+                elif event.code == 'BTN_START':
+                    self.Back = event.state
 
 
 if __name__ == '__main__':
