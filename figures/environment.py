@@ -36,8 +36,6 @@ class FrankaArmEnvironment:
         self.eefDebugLines = [[-1,(1,0,0),[1,0,0]], [-1,(0,1,0),[0,1,0]], [-1,(0,0,1),[0,0,1]]] #list of [id, dir, colour]  pos is fixed to eef position
         self.staticDebugLines = [] #list of [id, pos, dir, colour]
         self.dynamicDebugLines = [] #list of [id, pos, offset, dir, colour]
-        self.fixDynamicDebugLines = False #When true no longer updates position of dynamic lines
-        self.showDebugLines = True
 
         self.numAllJoints = p.getNumJoints(self.robotId)
         self.eefId = self.numAllJoints - 1
@@ -68,7 +66,7 @@ class FrankaArmEnvironment:
         self.focalLength = self.imgSize / (2 * tan(radians(self.fov) / 2))
         self.principalPoint = (self.imgSize / 2, self.imgSize / 2) #principal point in center of image
 
-        self.setDebugCameraState(2.0, 60.0, -35.0, [0.0, 0.2, 0.0])
+        self.setDebugCameraState(1.55, 60.0, -35.0, [0.0, 0.2, 0.0])
 
         #Let the environment come to rest before starting
         for _ in range(250):
@@ -321,9 +319,10 @@ class FrankaArmEnvironment:
         Removes all drawn static and dynamic debug lines.
         DOES NOT remove eefDebugLines, since these should always be drawn
         """
-        self.showDebugLines = False
         for line in self.staticDebugLines + self.dynamicDebugLines:
             p.removeUserDebugItem(line[0])
+        self.staticDebugLines = []
+        self.dynamicDebugLines = []
 
 
     def drawDebugLines(self):
@@ -339,21 +338,19 @@ class FrankaArmEnvironment:
             stop = pos + 0.2 * lineVector
             line[0] = p.addUserDebugLine(pos, stop, colour, replaceItemUniqueId=lineId)
 
-        if self.showDebugLines:
-            for line in self.staticDebugLines:
-                lineId, start, direction, colour = line
-                end = start + 0.05 * np.array(direction)
-                line[0] = p.addUserDebugLine(start, end, colour, replaceItemUniqueId=lineId)
+        for line in self.staticDebugLines:
+            lineId, start, direction, colour = line
+            end = start + 0.05 * np.array(direction)
+            line[0] = p.addUserDebugLine(start, end, colour, replaceItemUniqueId=lineId)
 
-            for line in self.dynamicDebugLines:
-                lineId, start, offset, direction, colour = line
+        for line in self.dynamicDebugLines:
+            lineId, start, offset, direction, colour = line
 
-                if not self.fixDynamicDebugLines:
-                    offset = (np.array(pos) - np.array(self.restPos))
+            offset = (np.array(pos) - np.array(self.restPos))
 
-                end = start + offset + 0.05 * np.array(direction)
-                line[0] = p.addUserDebugLine(start + offset, end, colour, replaceItemUniqueId=lineId)
-                line[2] = offset
+            end = start + offset + 0.05 * np.array(direction)
+            line[0] = p.addUserDebugLine(start + offset, end, colour, replaceItemUniqueId=lineId)
+            line[2] = offset
 
 
 
