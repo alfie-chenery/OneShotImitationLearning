@@ -41,8 +41,8 @@ The agent may choose not to use this new demonstration if it believes another de
 
 The button mapping will be given for an Xbox and PlayStation controller. Most controllers will work, but the buttons may have different names.
 
-- **A / &#10005** - Save the current end effector position, orientation and gripper state as a new key frame in the trace
-- **B / &#9675** - Revert the robot to the previous saved key frame (or initial position if none saved)
+- **A / Cross** - Save the current end effector position, orientation and gripper state as a new key frame in the trace
+- **B / Circle** - Revert the robot to the previous saved key frame (or initial position if none saved)
 - **Dpad Up** - Toggle wireframe view
 - **Dpad Down** - Override demonstration image. An image is automatically saved at the start of the program. However, you may override this with a new one using this button. The camera is attached to the end effector and faces along the end effector Z axis (blue). The object of interest in the demonstration must be clearly visible in the image, otherwise the agent will be unable to use this demonstration effectively.
 - **Dpad Left** - Toggle gripper open and closed
@@ -67,6 +67,3 @@ The button mapping will be given for an Xbox and PlayStation controller. Most co
 	- **In camera control mode**: Decreases the distance between the camera and the target position (zooms in)
 - **Start / Options** - Saves the trace as the 4 files mentioned above. Once saved exits the program. This will overwrite any other demonstrations in the directory which have not been renamed
 - **Back / Share** - Quits the program, does not save the demonstration
-
-&#10005
-&#9675
