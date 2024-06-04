@@ -197,7 +197,7 @@ def extract_corresponding_keypoints(img_live, img_init, displayMatches=True):
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f"Device: {device}")
 
-env = environment.FrankaArmEnvironment(videoLogging=False, out_dir=dir_path+"\\out")
+env = environment.FrankaArmEnvironment(videoLogging=True, out_dir=dir_path+"\\out")
 
 keypointExtracter = cv2.ORB_create(10000, fastThreshold=0)
 #keypointExtracter = cv2.SIFT_create()
