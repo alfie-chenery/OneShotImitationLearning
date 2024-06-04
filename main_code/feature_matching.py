@@ -3,6 +3,7 @@ import cv2
 import os
 from matplotlib import pyplot as plt
 
+#File to test different feature matching
 
 class FeatureMatcher():
 

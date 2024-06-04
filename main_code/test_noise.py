@@ -1,3 +1,6 @@
+# File to test robustness of findTransformation when it recieves ideal keypoint matches with increasing amount of noise
+
+
 import environment
 import torch
 import numpy as np 
@@ -128,8 +131,6 @@ def convertToWorldCoords(points, depth_map, viewMatrix):
 
     return np.array(out, dtype=np.float64)  
 
-    
-
 
 def computeError(points1, points2):    
     distances = np.linalg.norm(points1 - points2, axis=1)
@@ -138,46 +139,46 @@ def computeError(points1, points2):
     # to be fair we should normalise by the number of matches. Ie mean instead of sum
 
 
-def extractCorrespondingKeypoints(img_live, img_init, displayMatches=True):
-    kp_live, des_live = keypointExtracter.detectAndCompute(img_live, None)
-    kp_init, des_init = keypointExtracter.detectAndCompute(img_init, None)
+def extractIdealKeypoints(path):
+    points_init = [(10, 445),(140, 445),(10, 574),(140, 574)]
+    points_live = [(421, 650),(551, 650),(421, 779),(551, 779)] #0.5, 0.05 unrotated
 
-    if len(kp_live) == 0:
-        raise NoKeypointsException("Could not find keypoints in live image")
-    if len(kp_init) == 0 :
-        raise NoKeypointsException("Could not find keypoints in init image")
-
-    # Brute force greedy match keypoints based on descriptors, as a first guess
-    matches = keypointMatcher.match(des_live, des_init)
-
-    #TODO remove any matches which match between different objects using segmentation map
-
-    # GMS (Grid-based Motion Statistics) algorithm refines the guesses for high quality matches
-    matchesGMS = cv2.xfeatures2d.matchGMS(img_live.shape[:2], img_init.shape[:2], kp_live, kp_init, matches, withRotation=True, withScale=False)
-    #matchesGMS = matches
-
-    matchesGMS = sorted(matchesGMS, key=lambda x:x.distance)
-    #matchesGMS = matchesGMS[:500]
-
-    if len(matchesGMS) == 0:
-        raise NoKeypointsException("Could not match any keypoints")
-
-    if displayMatches:
-        matchImg = cv2.drawMatches(img_live, kp_live, img_init, kp_init, matchesGMS, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-        plt.figure(figsize = (8,6))
-        plt.imshow(matchImg)
-        plt.pause(0.01)
-
-    #Extract matching coordinates
-    points_live, points_init = [], []
-    for m in matchesGMS:
-        x, y = kp_live[m.queryIdx].pt
-        points_live.append( (x, y) )
-
-        u, v = kp_init[m.trainIdx].pt
-        points_init.append( (u, v) )
+    #maybe load from a file for easier use
 
     return (points_live, points_init)
+
+
+def addKeypointNoise(points, low, high):
+    """
+    Add 2d noise to the pixel coordinate of keypoints. Does not affect the depth image
+    (but may now read the wrong pixel's depth). The whole point is to test poor keypoint matching
+    """
+    for i in range(len(points)):
+        theta = np.random.uniform(0, 2 * np.pi)
+        x = np.cos(theta)
+        y = np.sin(theta)
+        randomVector = np.array([x,y])
+        randomMagnitude = np.random.uniform(low, high)
+        assert np.isclose(np.linalg.norm(randomVector), 1.0) #should be unit vector
+
+        randomVector *= randomMagnitude
+        points[i] = (points[i][0] + randomVector[0], points[i][1] + randomVector[1])
+
+
+def addCoordinateNoise(points, low, high):
+    """
+    Add 3d noise to world coordinates of keypoints
+    """
+    for i in range(len(points)):
+        theta = np.random.uniform(0, 2 * np.pi)
+        z = np.random.uniform(-1, 1)
+        x = np.sqrt(1 - np.square(z)) * np.cos(theta)
+        y = np.sqrt(1 - np.square(z)) * np.sin(theta)
+        randomVector = np.array([x,y,z])
+        randomMagnitude = np.random.uniform(low, high)
+
+        assert np.isclose(np.linalg.norm(randomVector), 1.0) #should be unit vector
+        points[i] += randomMagnitude * randomVector
 
 
 
@@ -221,15 +222,17 @@ while error > ERR_THRESHOLD: # or iter < 2:
     _, _, live_rgb, live_depth, _, live_vm = env.robotGetCameraSnapshot()
     
     try:
-        points_live, points_demo = extractCorrespondingKeypoints(live_rgb, demo_rgb)
+        points_live, points_demo = extractIdealKeypoints("") #path_to_file_based_on_best[1])
 
-        #TESTING
-        # points_demo = [(10, 445),(140, 445),(10, 574),(140, 574)]
-        # points_live = [(421, 650),(551, 650),(421, 779),(551, 779)] #0.5, 0.05 unrotated
-        #points_live = [(401, 738),(462, 629), (508, 800), (570, 693)] #0.5, 0.05, rotated pi/3
-
+        points_live = addKeypointNoise(points_live, 0, 5) #pixels
+        points_demo = addKeypointNoise(points_demo, 0, 5)
+        
         points_live = convertToWorldCoords(points_live, live_depth, live_vm)
         points_demo = convertToWorldCoords(points_demo, demo_depth, demo_vm)
+
+        points_live = addCoordinateNoise(points_live, 0, 0.05) #meters
+        points_demo = addCoordinateNoise(points_demo, 0, 0.05)
+
         for i in range(len(points_live)):
             pos = points_live[i]
             env.addDebugLine(pos, (0,0,1), [1,0,1], True)

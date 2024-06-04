@@ -32,12 +32,9 @@ class FrankaArmEnvironment:
         self.robotId = p.loadURDF("franka_panda/panda.urdf", [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0], useFixedBase=True)
         self.tableId = p.loadURDF("table/table.urdf", [0.6, 0.0, -0.2], p.getQuaternionFromEuler([0.0, 0.0, np.pi/2]), useFixedBase=True)
         #self.objectId = p.loadURDF("urdf/mug.urdf", [0.63, 0.05, 0.45], [0.0, 0.0, 0.0, 1.0])
-        self.objectId = p.loadURDF("lego/lego.urdf", [0.5, 0.1, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
-        self.eefDebugLines = [[-1,(1,0,0),[1,0,0]], [-1,(0,1,0),[0,1,0]], [-1,(0,0,1),[0,0,1]]] #list of [id, dir, colour]  pos is fixed to eef position
-        self.staticDebugLines = [] #list of [id, pos, dir, colour]
-        self.dynamicDebugLines = [] #list of [id, pos, offset, dir, colour]
-        self.fixDynamicDebugLines = False #When true no longer updates position of dynamic lines
-        self.showDebugLines = True
+        self.objectId = p.loadURDF("lego/lego.urdf", [0.6, 0.0, 0.45], p.getQuaternionFromEuler([0.0, 0.0, 0.0]))
+        self.eefDebugLines = [[-1,(1,0,0),[1,0,0]], [-1,(0,1,0),[0,1,0]], [-1,(0,0,1),[0,0,1]]]  # lines relative to  pos (draw basis vectors)
+        self.debugLines = [] #list of [id, pos, dir, colour]
 
         self.numAllJoints = p.getNumJoints(self.robotId)
         self.eefId = self.numAllJoints - 1
@@ -300,35 +297,14 @@ class FrankaArmEnvironment:
         p.resetDebugVisualizerCamera(cameraDist, cameraYaw, cameraPitch, cameraTarget)
 
 
-    def addDebugLine(self, pos, direction, colour, static):
-        """
-        Add a debug line to be drawn each frame
-        if static is True:
-          line is drawn fixed at world coords pos, with direction and colour as specified
-        else:
-          line is drawn at pos offset from eef position, with direction and colour as specified
-        colour is a list [R,G,B] with values 0..1
-        """
-        if static:
-            self.staticDebugLines.append([-1, pos, direction, colour])
-        else:
-            offset = np.zeros(3)
-            self.dynamicDebugLines.append([-1, pos, offset, direction, colour])
-
-
-    def removeAllDebugLines(self):
-        """
-        Removes all drawn static and dynamic debug lines.
-        DOES NOT remove eefDebugLines, since these should always be drawn
-        """
-        self.showDebugLines = False
-        for line in self.staticDebugLines + self.dynamicDebugLines:
-            p.removeUserDebugItem(line[0])
-
+    def addDebugLine(self, pos, direction, colour):
+        self.debugLines.append([-1, pos, direction, colour])
 
     def drawDebugLines(self):
         """
-        Draws the lines specified in self.eefDebugLines, self.staticDebugLines and self.dynamicDebugLines
+        Draws the lines specified in self.debugLines
+        Each line is of the form [id, vector, colour]
+        where vector is relative to the robots eef and colour is a list [R,G,B] with values 0..1
         """
         pos, orn = self.robotGetEefPosition()
         rotationMatrix = self.getMatrixFromQuaternion(orn)
@@ -337,23 +313,16 @@ class FrankaArmEnvironment:
             lineId, direction, colour = line
             lineVector = rotationMatrix.dot(direction)
             stop = pos + 0.2 * lineVector
+
             line[0] = p.addUserDebugLine(pos, stop, colour, replaceItemUniqueId=lineId)
 
-        if self.showDebugLines:
-            for line in self.staticDebugLines:
-                lineId, start, direction, colour = line
-                end = start + 0.05 * np.array(direction)
-                line[0] = p.addUserDebugLine(start, end, colour, replaceItemUniqueId=lineId)
+        for line in self.debugLines:
+            lineId, start, direction, colour = line
+            #start = start + np.array(pos) - np.array(self.restPos)
+            #TODO: maybe make it so blue lines move with eef until they overlap pink
+            end = start + 0.05 * np.array(direction)
 
-            for line in self.dynamicDebugLines:
-                lineId, start, offset, direction, colour = line
-
-                if not self.fixDynamicDebugLines:
-                    offset = (np.array(pos) - np.array(self.restPos))
-
-                end = start + offset + 0.05 * np.array(direction)
-                line[0] = p.addUserDebugLine(start + offset, end, colour, replaceItemUniqueId=lineId)
-                line[2] = offset
+            line[0] = p.addUserDebugLine(start, end, colour, replaceItemUniqueId=lineId)
 
 
 
