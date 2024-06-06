@@ -61,7 +61,7 @@ def main():
 
         
         if cameraMode:
-            cameraYaw, cameraPitch, cameraDist, cameraTarget = env.getDebugCameraState()
+            cameraDist, cameraYaw, cameraPitch, cameraTarget = env.getDebugCameraState()
             cameraYaw += joystickSensitivity * controller.RightJoystickX
             cameraPitch += joystickSensitivity * controller.RightJoystickY
             cameraDist += triggerSensitivity * 0.1 * (controller.LeftBumper - controller.RightBumper)

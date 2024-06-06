@@ -157,6 +157,9 @@ def extractCorrespondingKeypoints(img_live, img_init, displayMatches=True):
     #matchesGMS = matches
 
     matchesGMS = sorted(matchesGMS, key=lambda x:x.distance)
+    
+    # n = len(matchesGMS)
+    # matchesGMS = matchesGMS[:n//2] # take only the best half of matches
     #matchesGMS = matchesGMS[:500]
 
     if len(matchesGMS) == 0:
@@ -191,6 +194,7 @@ keypointExtracter = cv2.ORB_create(10000, fastThreshold=0)
 keypointMatcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
 #keypointMatcher = cv2.BFMatcher()
 
+drawKeypointsInWorld = False
 
 
 plt.ion()
@@ -230,13 +234,15 @@ while error > ERR_THRESHOLD: # or iter < 2:
 
         points_live = convertToWorldCoords(points_live, live_depth, live_vm)
         points_demo = convertToWorldCoords(points_demo, demo_depth, demo_vm)
-        for i in range(len(points_live)):
-            pos = points_live[i]
-            env.addDebugLine(pos, (0,0,1), [1,0,1], True)
-        for i in range(len(points_demo)):
-            pos = points_demo[i]
-            env.addDebugLine(pos, (0,0,1), [0,1,1], False)
-        env.drawDebugLines()
+
+        if drawKeypointsInWorld:
+            for i in range(len(points_live)):
+                pos = points_live[i]
+                env.addDebugLine(pos, (0,0,1), [1,0,1], True)
+            for i in range(len(points_demo)):
+                pos = points_demo[i]
+                env.addDebugLine(pos, (0,0,1), [0,1,1], False)
+            env.drawDebugLines()
 
         print(points_live)
         print(points_demo)
@@ -258,6 +264,8 @@ while error > ERR_THRESHOLD: # or iter < 2:
         env.robotSetJointAngles(env.restPoses)
         randomTranslation = np.append(np.random.uniform(-0.2, 0.2, 2), 0).tolist()
         env.robotMoveEefPosition(randomTranslation, np.identity(3))
+        offset_pos = np.zeros(3)
+        offset_ornMat = np.eye(3)
         continue
     
     # Cumulative offset so far

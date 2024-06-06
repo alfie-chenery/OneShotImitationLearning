@@ -4,7 +4,7 @@ import os
 
 dir_path = os.path.dirname(os.path.abspath(__file__))
 
-env = environment.FrankaArmEnvironment(videoLogging=True, out_dir=os.path.join(dir_path, "out"))
+env = environment.FrankaArmEnvironment(videoLogging=False, out_dir=os.path.join(dir_path, "out"))
 
 with open(os.path.join(dir_path, "demonstration.pkl"), 'rb') as f:
     trace = pickle.load(f)
@@ -20,4 +20,6 @@ for keyFrame in range(len(trace)):
         desired_angles = trace[keyFrame]
         env.robotSetJointAngles(desired_angles)
 
+for _ in range(100):
+    env.stepEnv()
 env.closeEnv()
