@@ -1,0 +1,59 @@
+\documentclass[a4paper, twoside, 12pt]{report}
+
+%% Language and font encodings
+\usepackage[english]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage[T1]{fontenc}
+
+%% Sets page size and margins
+\usepackage[a4paper,top=2cm,bottom=2cm,left=3cm,right=3cm,marginparwidth=1.75cm]{geometry}
+%top was 3cm
+
+%% Useful packages
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+\usepackage{wrapfig}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage[colorinlistoftodos]{todonotes}
+\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+\usepackage[numbers]{natbib}
+
+% load some macros
+\input{macros}
+
+\title{Lightweight One-shot Imitation Learning}
+\author{Alfie Chenery}
+% Update supervisor and other title stuff in title/title.tex
+
+\begin{document}
+\input{title/title.tex}
+
+%TODO
+\begin{abstract}
+State of the art robot learning systems reduce the workload of collecting training data through 
+\end{abstract}
+
+%TODO
+\renewcommand{\abstractname}{Acknowledgements}
+\begin{abstract}
+Thanks Dayana
+\end{abstract}
+
+\tableofcontents
+%\listoffigures
+%\listoftables
+
+\input{introduction.tex}
+\input{background.tex}
+\input{project.tex}
+\input{evaluation.tex}
+\input{conclusion.tex}
+
+\bibliographystyle{unsrtnat} %alpha
+\bibliography{references}
+
+\input{appendix.tex}
+
+\end{document}

@@ -1,0 +1,7 @@
+pos and orn of demo
+
+lego
+mug - [0.5,0,0] [0,0,0]
+domino - [0.5 + i/25, 0, 0.45], [0,0,0,1])
+jenga - [0.4, -0.1, 0.45], [0,0,pi/2]
+sphere small - [0.6,0,0] [0,0,pi/3]
