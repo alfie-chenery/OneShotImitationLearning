@@ -89,6 +89,8 @@ def findTransformation(P, Q):
 
     #Create sign matrix to correct for reflections
     sign = np.linalg.det(U) * np.linalg.det(Vt)
+    assert abs(sign) > 0.99  #should be very close to 1 or -1 (floating point errors)
+    sign = round(sign)       #fix said floating point rounding errors
     S = np.diag([1] * (m-1) + [sign])
 
     #Compute rotation matrix
