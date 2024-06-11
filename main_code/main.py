@@ -14,6 +14,7 @@ import keyboard
 class NoKeypointsException(Exception):
     pass
 
+
 dir_path = os.path.dirname(os.path.realpath(__file__))
 dino = torch.hub.load('facebookresearch/dino:main', 'dino_vitb8')
 
@@ -131,6 +132,12 @@ def convertToWorldCoords(points, depth_map, viewMatrix):
     return np.array(out, dtype=np.float64)  
 
     
+def circmean(thetas):
+        a = np.mean(np.sin(thetas))
+        b = np.mean(np.cos(thetas))
+        x = np.arctan2(a, b)
+        return x
+
 
 
 def computeError(points1, points2):    
@@ -156,16 +163,41 @@ def extractCorrespondingKeypoints(img_live, img_init, displayMatches=True):
 
     # GMS (Grid-based Motion Statistics) algorithm refines the guesses for high quality matches
     matchesGMS = cv2.xfeatures2d.matchGMS(img_live.shape[:2], img_init.shape[:2], kp_live, kp_init, matches, withRotation=True, withScale=False)
-    #matchesGMS = matches
+
+    if len(matchesGMS) == 0:
+        raise NoKeypointsException("Could not match any keypoints")
+
+
+    #compute our own distance metric
+    # matches which largely disagree with the mean, should be removed
+    thetas = []
+    for m in matchesGMS:
+        x, y = kp_live[m.queryIdx].pt
+        u, v = kp_init[m.trainIdx].pt
+        thetas.append(np.arctan2(v-y, u-x))
+
+    avg_theta = circmean(thetas)
+
+    for i, m in enumerate(matchesGMS):
+        m.distance = abs(thetas[i] - avg_theta)
+
+
 
     matchesGMS = sorted(matchesGMS, key=lambda x:x.distance)
+    d = [x.distance for x in matchesGMS]
+    dd = [b-a for (b,a) in zip(d[1:], d)]
+    # plt.plot(d, 'b-')
+    plt.plot(dd, 'r-')
+    plt.title('Plot of finite difference of match distance')
+    plt.xlabel('Index of sorted list')
+    plt.ylabel('Difference (Radians)')
+    plt.show()
+    displayMatches = False
 
     # n = len(matchesGMS)
     # matchesGMS = matchesGMS[:n//2] # take only the best half of matches
     #matchesGMS = matchesGMS[:500]
-
-    if len(matchesGMS) == 0:
-        raise NoKeypointsException("Could not match any keypoints")
+    
 
     if displayMatches:
         matchImg = cv2.drawMatches(img_live, kp_live, img_init, kp_init, matchesGMS, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
@@ -199,7 +231,7 @@ keypointMatcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
 drawKeypointsInWorld = True
 
 
-plt.ion()
+# plt.ion()
 
 #take initial screenshot
 env.robotSaveCameraSnapshot("init", dir_path + "\\temp")
