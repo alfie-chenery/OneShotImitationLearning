@@ -98,9 +98,9 @@ def findTransformation(P, Q):
     
     t = centroidP - centroidQ
 
-    Qprime = np.array([t + R @ q for q in Q])
+    #Qprime = np.array([t + R @ q for q in Q])
 
-    return R, t, Qprime
+    return R, t
 
 
 def convertToWorldCoords(points, depth_map, viewMatrix):
@@ -159,7 +159,7 @@ def extractCorrespondingKeypoints(img_live, img_init, displayMatches=True):
     #matchesGMS = matches
 
     matchesGMS = sorted(matchesGMS, key=lambda x:x.distance)
-    
+
     # n = len(matchesGMS)
     # matchesGMS = matchesGMS[:n//2] # take only the best half of matches
     #matchesGMS = matchesGMS[:500]
@@ -189,14 +189,14 @@ def extractCorrespondingKeypoints(img_live, img_init, displayMatches=True):
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f"Device: {device}")
 
-env = environment.FrankaArmEnvironment(videoLogging=True, out_dir=dir_path+"\\out")
+env = environment.FrankaArmEnvironment(videoLogging=False, out_dir=dir_path+"\\out")
 
 keypointExtracter = cv2.ORB_create(10000, fastThreshold=0)
 #keypointExtracter = cv2.SIFT_create()
 keypointMatcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
 #keypointMatcher = cv2.BFMatcher()
 
-drawKeypointsInWorld = False
+drawKeypointsInWorld = True
 
 
 plt.ion()
@@ -227,7 +227,7 @@ while error > ERR_THRESHOLD: # or iter < 2:
     _, _, live_rgb, live_depth, _, live_vm = env.robotGetCameraSnapshot()
     
     try:
-        points_live, points_demo = extractCorrespondingKeypoints(live_rgb, demo_rgb)
+        points_live, points_demo = extractCorrespondingKeypoints(live_rgb, demo_rgb, displayMatches=True)
 
         #TESTING
         # points_demo = [(10, 445),(140, 445),(10, 574),(140, 574)]
@@ -238,18 +238,22 @@ while error > ERR_THRESHOLD: # or iter < 2:
         points_demo = convertToWorldCoords(points_demo, demo_depth, demo_vm)
 
         if drawKeypointsInWorld:
-            for i in range(len(points_live)):
+            #limit the amount we draw to ~150, after this it gets too slow.
+            # dont just draw the first 150 as they will be all over one side.
+            step = int(np.ceil((len(points_live) / 150)))
+
+            for i in range(0, len(points_live), step):
                 pos = points_live[i]
                 env.addDebugLine(pos, (0,0,1), [1,0,1], True)
-            for i in range(len(points_demo)):
+            for i in range(0, len(points_demo), step):
                 pos = points_demo[i]
                 env.addDebugLine(pos, (0,0,1), [0,1,1], False)
             env.drawDebugLines()
 
-        print(points_live)
-        print(points_demo)
+        # print(points_live)
+        # print(points_demo)
 
-        R, t, _ = findTransformation(points_live, points_demo)
+        R, t = findTransformation(points_live, points_demo)
         print(f"Incremental Update:\n  Translation:{t},\n  Rotation (Matrix):\n{R}\n  Rotation (euler):{env.getEulerFromMatrix(R)}\n")
 
         error = computeError(points_live, points_demo)
@@ -311,5 +315,5 @@ for keyFrame in range(len(demo_trace)):
 for _ in range(100):
     env.stepEnv()
 
-env.closeEnv()
+# env.closeEnv()
 

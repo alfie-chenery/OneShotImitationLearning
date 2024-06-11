@@ -33,10 +33,10 @@ class FrankaArmEnvironment:
         self.tableId = p.loadURDF("table/table.urdf", [0.6, 0.0, -0.2], p.getQuaternionFromEuler([0.0, 0.0, np.pi/2]), useFixedBase=True)
 
         # self.objectId = p.loadURDF("urdf/mug.urdf", [0.55, -0.1, 0.45], p.getQuaternionFromEuler([0.0, 0.0, 0.0]))
-        # self.objectId = p.loadURDF("lego/lego.urdf", [0.5, 0.1, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
+        self.objectId = p.loadURDF("lego/lego.urdf", [0.5, 0.05, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
         # self.objectId = p.loadURDF("sphere_small.urdf", [0.55, 0, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
         # self.objectId = p.loadURDF("sphere_small.urdf", [0.55, 0, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
-        self.objectId = p.loadURDF("jenga/jenga.urdf", [0.4, -0.1, 0.45], p.getQuaternionFromEuler([0.0, 0.0, 0.0]))
+        # self.objectId = p.loadURDF("jenga/jenga.urdf", [0.4, -0.1, 0.45], p.getQuaternionFromEuler([0.0, 0.0, 0.0]))
         
         # for i in range(10):
         #     p.loadURDF("domino/domino.urdf", [0.55 + i/25, -0.05, 0.45], [0,0,0,1])
