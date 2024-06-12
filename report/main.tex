@@ -13,12 +13,20 @@
 \usepackage{amsmath}
 \usepackage{amsfonts}
 \usepackage{graphicx}
+\usepackage{tabularx}
+\usepackage{adjustbox}
+\usepackage[table]{xcolor}
 \usepackage{wrapfig}
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage[colorinlistoftodos]{todonotes}
 \usepackage[colorlinks=true, allcolors=blue]{hyperref}
 \usepackage[numbers]{natbib}
+
+\usepackage{algorithm}
+\usepackage[noEnd=false, indLines=false, spaceRequire=true, beginComment=//~]{algpseudocodex}
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\renewcommand{\algorithmicensure}{\textbf{Assert:}}
 
 % load some macros
 \input{macros}
@@ -32,13 +40,22 @@
 
 %TODO
 \begin{abstract}
-State of the art robot learning systems reduce the workload of collecting training data through 
+One-shot imitation learning is a leading approach in robotic learning, valued for minimizing the need for time consuming, human-collected demonstrations. However, the computational demands of these algorithms are substantial. What options exist when these requirements surpass available hardware capabilities? This paper explores alternatives to state-of-the-art one-shot imitation learning algorithms and presents a system achieving comparable results with drastically reduced hardware requirements. This advancement lowers the barrier of entry, making such systems accessible to a wider audience, without the need for high-end GPUs.
+
+%At a time where Moore's law appears to have begun to plateau, we can no longer simply rely on new hardware to be more powerful and speed up our algorithms.\\
+%In the field of robotic learning, one-shot imitation learning stands as one of the best algorithms due to its ability to reduce the workload of engineers collecting demonstrations. Instead this workload is offloaded to the algorithm, which resultantly needs huge computational power to work. But what do we do when the algorithm requirements exceed that of our available hardware? In this paper we explore alternatives to current state of the art one-shot imitation learning algorithms, and create a system which can achieve comparable results, with drastically lower hardware requirements. This lowers the barrier to entry for such systems, allowing them to be run by more people, without top of the line GPUs. 
 \end{abstract}
 
 %TODO
 \renewcommand{\abstractname}{Acknowledgements}
 \begin{abstract}
-Thanks Dayana
+Firstly, I would like to thank my supervisor, Dr.~Edward Johns, for his support and guidance throughout this project. His expertise and feedback have been greatly appreciated.
+\\
+
+I would like to personally thank my sayang, Dayana Muhd Faisal, for her help proof reading and her unending support through all the challenges of this year and those previous. I would likely not be at this point without her.
+\\
+
+Lastly, I would like to thank my friends and family for their support throughout my whole degree. 
 \end{abstract}
 
 \tableofcontents

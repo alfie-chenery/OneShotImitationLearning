@@ -1,11 +1,13 @@
+%1
 @online{pybullet,
   author = {Erwin Coumans and Yunfei Bai},
   title = {PyBullet, a Python module for physics simulation for games, robotics and machine learning},
   year = {2016-2021},
   url ={https://pybullet.org},
-  note = {[Accessed on 2023-01-23]}
+  note = {[Accessed on 2023-11-23]}
 }
 
+%2 - NOT USED YET
 @article{model-based-control,
     title = {Experimental evaluation of model-based controllers on a direct-drive robot arm},
     journal = {Mechatronics},
@@ -19,7 +21,8 @@
     author = {Fernando Reyes and Rafael Kelly}
 }
 
-@book{model-based-rl,
+%3
+@book{reinforcement-learning,
     author = {Richard S. Sutton and Andrew G. Barto},
     title = {Reinforcement Learning: An Introduction},
     chapter = 4,
@@ -27,6 +30,7 @@
     year = 2018
 }
 
+%4
 @inproceedings{one-shot-imitation,
      title={DINOBot: Robot Manipulation via Retrieval and Alignment with Vision Foundation Models},
      author={Norman Di Palo and Edward Johns},
@@ -34,6 +38,7 @@
      booktitle={IEEE International Conference on Robotics and Automation (ICRA)}
 }
 
+%5
 @inproceedings{one-shot-pose-estimate,
     title={One-Shot Imitation Learning: A Pose Estimation Perspective},
     author={Vitiello, Pietro and Dreczkowski, Kamil and Johns, Edward},
@@ -41,19 +46,24 @@
     year={2023}
 }
 
+%6
 @unpublished{inverse-rl,
     author = {Feiyang Wu, Zhaoyuan Gu, Hanran Wu, Anqi Wu, Ye Zhao},
     title = {Infer and Adapt: Bipedal Locomotion Reward Learning from Demonstrations via Inverse Reinforcement Learning},
+    year={2023},
     url = {https://arxiv.org/abs/2309.16074}
 }
 
+%7
 @unpublished{mimicgen,
     author = {Ajay Mandlekar, Soroush Nasiriany, Bowen Wen, Iretiayo Akinola, Yashraj Narang, Linxi Fan, Yuke Zhu, Dieter Fox},
     title = {
     MimicGen: A Data Generation System for Scalable Robot Learning using Human Demonstrations},
+    year={2023},
     url = {https://arxiv.org/abs/2310.17596}
 }
 
+%8
 @online{quaternions,
     author = {Sir William Rowan Hamilton},
     title = {On quaternions, or on a new system of imaginaries in algebra},
@@ -61,6 +71,7 @@
     url ={https://www.emis.de/classics/Hamilton/OnQuat.pdf}
 }
 
+%9
 @online{orientations,
     author = {James Diebel},
     title = {Representing attitude: Euler angles, unit quaternions, and rotation vectors},
@@ -68,6 +79,7 @@
     url ={https://www.astro.rug.nl/software/kapteyn-beta/_downloads/attitude.pdf}
 }
 
+%10
 @inproceedings{dino-paper,
   title={Emerging Properties in Self-Supervised Vision Transformers},
   author={Caron, Mathilde and Touvron, Hugo and Misra, Ishan and J\'egou, Herv\'e  and Mairal, Julien and Bojanowski, Piotr and Joulin, Armand},
@@ -75,9 +87,103 @@
   year={2021}
 }
 
+%11
 @online{euler-theorem,
     author = {Leonhard Euler},
     title = {General formulas for any translation of rigid bodies},
     year = {1776},
+    pages = {12-22},
     url ={https://www.17centurymaths.com/contents/euler/e478tr.pdf}
 }
+
+%12
+@online{ndc,
+    author = {Nathan Reed},
+    title = {World coordinates, Normalised device coordinates and device coordinates. [Computer graphics stack exchange]},
+    year = {2015},
+    url ={https://computergraphics.stackexchange.com/questions/1769/world-coordinates-normalised-device-coordinates-and-device-coordinates}
+}
+
+%13
+@online{uniform-3d-vector,
+    author = {Weisstein, Eric W},
+    title = {"Sphere Point Picking." From MathWorld--A Wolfram Web Resource},
+    url ={https://mathworld.wolfram.com/SpherePointPicking.html},
+    note = {[Accessed on 2024-06-10]}
+}
+
+%14
+@online{cylinder-proj,
+    author = {Jim Belk},
+    title = {How to find a random axis or unit vector in 3D? [Maths stack exchange]},
+    year = {2011},
+    url ={https://math.stackexchange.com/questions/44689/how-to-find-a-random-axis-or-unit-vector-in-3d},
+    note = {[Accessed on 2024-06-10]}
+}
+
+%15
+@article{random-vector,
+    author = {Muller, Mervin E.},
+    title = {A note on a method for generating points uniformly on n-dimensional spheres},
+    year = {1959},
+    issue_date = {April 1959},
+    publisher = {Association for Computing Machinery},
+    address = {New York, NY, USA},
+    volume = {2},
+    number = {4},
+    issn = {0001-0782},
+    url = {https://doi.org/10.1145/377939.377946},
+    doi = {10.1145/377939.377946},
+    journal = {Commun. ACM},
+    month = {apr},
+    pages = {19–20},
+    numpages = {2}
+}
+
+%16
+@article{kabsch,
+    author = "Kabsch, W.",
+    title = "{A solution for the best rotation to relate two sets of vectors}",
+    journal = "Acta Crystallographica Section A",
+    year = "1976",
+    volume = "32",
+    number = "5",
+    pages = "922--923",
+    month = "Sep",
+    doi = {10.1107/S0567739476001873},
+    url = {https://doi.org/10.1107/S0567739476001873}
+}
+
+%17
+@online{homogenous-coords,
+    author = {Tom Dalling},
+    title = {Explaining Homogeneous Coordinates & Projective Geometry},
+    year = {2014},
+    url ={https://www.tomdalling.com/blog/modern-opengl/explaining-homogenous-coordinates-and-projective-geometry/},
+    note = {[Accessed on 2024-06-12]}
+}
+
+%18
+@online{gimbal,
+    author = {Jonathan Strickland},
+    title = {What is a gimbal -- and what does it have to do with NASA?},
+    year = {2023},
+    url ={https://science.howstuffworks.com/gimbal.htm},
+    note = {[Accessed on 2024-06-12]}
+}
+
+%19
+@article{gimbal-lock,
+    author={Hemingway, Evan G.
+    and O'Reilly, Oliver M.},
+    title={Perspectives on Euler angle singularities, gimbal lock, and the orthogonality of applied forces and applied moments},
+    journal={Multibody System Dynamics},
+    year={2018},
+    volume={44},
+    number={1},
+    pages={31-56},
+    issn={1573-272X},
+    doi={10.1007/s11044-018-9620-0},
+    url={https://doi.org/10.1007/s11044-018-9620-0}
+}
+
