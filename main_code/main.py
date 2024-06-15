@@ -184,15 +184,15 @@ def extractCorrespondingKeypoints(img_live, img_init, displayMatches=True):
 
 
     matchesGMS = sorted(matchesGMS, key=lambda x:x.distance)
-    d = [x.distance for x in matchesGMS]
-    dd = [b-a for (b,a) in zip(d[1:], d)]
-    # plt.plot(d, 'b-')
-    plt.plot(dd, 'r-')
-    plt.title('Plot of finite difference of match distance')
-    plt.xlabel('Index of sorted list')
-    plt.ylabel('Difference (Radians)')
-    plt.show()
-    displayMatches = False
+    # d = [x.distance for x in matchesGMS]
+    # dd = [b-a for (b,a) in zip(d[1:], d)]
+    # # plt.plot(d, 'b-')
+    # plt.plot(dd, 'r-')
+    # plt.title('Plot of finite difference of match distance')
+    # plt.xlabel('Index of sorted list')
+    # plt.ylabel('Difference (Radians)')
+    # plt.show()
+    # displayMatches = False
 
     # n = len(matchesGMS)
     # matchesGMS = matchesGMS[:n//2] # take only the best half of matches
