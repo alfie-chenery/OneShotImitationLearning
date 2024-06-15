@@ -125,7 +125,7 @@ def actualTransform(item):
         E = [0, 0, 0]
 
     if item == "Jenga":
-        t = [0.1, 0.15, 0]
+        t = [0.09, 0.15, 0]
         E = [0, 0, -np.pi/6]
 
     if item == "Dominoes":
@@ -151,7 +151,7 @@ def extractIdealKeypoints(item):
         points_live = [(470,957), (498,957), (614,830), (614,805), (493,682), (476,681), (570,899)]  #[0.5, 0.07, 0.45] [0,0,pi/3]
 
     if item == "Jenga":
-        points_demo = [(770,389), (976,389), (765,106), (795,128), (814,128), (814,282), (822,282), (822,128), (841,128), (841,106), (870,152), (870,174), (870,262), (871,285), (910,154), (903,154), (903,331), (911,311), (911,272), (921,262), (922,174), (911,167)]  #[0.4, -0.1,  0.45] [0, 0, pi/2]
+        points_demo = [(770,389), (976,389), (765,106), (795,128), (814,128), (814,282), (822,282), (822,128), (841,128), (841,106), (870,152), (870,174), (870,262), (871,285), (910,154), (903,154), (903,331), (911,311), (911,272), (921,262), (922,174), (911,167)]  #[0.41, -0.1,  0.45] [0, 0, pi/2]
         points_live = [(239,728), (417,831), (401,495), (390,514), (407,524), (330,658), (336,662), (413,528), (431,537), (442,518), (445,573), (433,592), (389,668), (377,688), (477,595), (472,591), (383,743), (389,748), (419,698), (433,693), (477,618), (473,605)]  #[0.5, 0.05, 0.45] [0, 0, pi/3]
 
     if item == "Dominoes":
@@ -214,9 +214,15 @@ def vector_error(predicted, truth):
     return predicted - truth
 
 
-def rotation_error(predicted, truth):
+def rotation_error(predicted, truth, degrees=False):
     rel_R = np.dot(predicted.T, truth) # Compute the relative rotation matrix
-    theta = np.arccos((np.trace(rel_R) - 1) / 2) # Compute the angle using the trace of the relative rotation matrix
+    cos_theta = (np.trace(rel_R) - 1) / 2 # Compute the angle using the trace of the relative rotation matrix
+    # cos_theta = np.clip(cos_theta, -1, 1)
+    theta = np.arccos(cos_theta)
+
+    if degrees:
+        theta = theta * 180/np.pi
+
     return theta
 
 
@@ -229,13 +235,15 @@ env.robotGetCameraSnapshot()
 
 np.random.seed(17)  # For reproduceable results across different graphs, can set to any seed you want
 
-
+#============================================================================================
 noise_mode = "coordinate_noise"  #["coordinate_noise", "pixel_noise"]
-shift_error = False    #shift the lines so that the error with 0 noise is 0. Essentially remove error due to human error in keypoints and numerical errors
+shift_error = True    #shift the lines so that the error with 0 noise is 0. Essentially remove human error in keypoints and numerical errors
 
 numRuns = 1000 if noise_mode == "pixel_noise" else 100 #100
 items = ["Lego", "Mug", "Ball", "Jenga", "Dominoes"]
 noiseAmounts = [0] + (list(range(0,21,2)) if noise_mode == "pixel_noise" else np.arange(0, 0.2, 0.001).tolist())
+#=============================================================================================
+
 results = ([],[],[],[],[])
 
 with open(dir_path + f"\\results-{noise_mode}.txt", 'w') as f:
@@ -280,7 +288,7 @@ with open(dir_path + f"\\results-{noise_mode}.txt", 'w') as f:
             errors = [distance_error(t,actual_t) for t in ts]
             avg_t_dist = np.mean(errors)
 
-            errors = [rotation_error(R,actual_R) for R in Rs]
+            errors = [rotation_error(R,actual_R, degrees=True) for R in Rs]
             avg_R_err = np.mean(errors)
 
             errors = [vector_error(E,actual_E) for E in Es]
@@ -296,14 +304,20 @@ with open(dir_path + f"\\results-{noise_mode}.txt", 'w') as f:
             print(f"avg E distance: {avg_E_dist}", file=f)
             print(f"avg R error: {avg_R_err}\n", file=f)
 
+            #=======================================================
+            graph_metric = avg_R_err
+            #make sure to update graph labels if you change this
+            #========================================================
+            
+
             if shift_error:
                 #Shift results so that the initial error is 0
                 if len(results[index]) == 0:
-                    results[index].append(avg_t_dist)
+                    results[index].append(graph_metric)
                 else:
-                    results[index].append(avg_t_dist - results[index][0])
+                    results[index].append(graph_metric - results[index][0])
             else:
-                results[index].append(avg_t_dist)
+                results[index].append(graph_metric)
             
         print("\n\n", file=f)
 
@@ -320,7 +334,7 @@ for item in range(len(results)):
     plt.plot(xs, results[item], label=items[item])
 
 plt.title('Plot of translation error as keypoint noise increases')
-plt.ylabel('Error distance (metres)')
+plt.ylabel('Error magnitude (radians)')
 # plt.ylim(0, np.max(np.array(results)))
 plt.legend(loc="upper left")
 plt.xlabel("Noise (meters)" if noise_mode == "coordinate_noise" else "Noise (pixels)")

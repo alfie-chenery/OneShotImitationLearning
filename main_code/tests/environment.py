@@ -32,14 +32,15 @@ class FrankaArmEnvironment:
         self.robotId = p.loadURDF("franka_panda/panda.urdf", [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0], useFixedBase=True)
         self.tableId = p.loadURDF("table/table.urdf", [0.6, 0.0, -0.2], p.getQuaternionFromEuler([0.0, 0.0, np.pi/2]), useFixedBase=True)
 
-        # self.objectId = p.loadURDF("urdf/mug.urdf", [0.55, -0.1, 0.45], p.getQuaternionFromEuler([0.0, 0.0, 0.0]))
-        self.objectId = p.loadURDF("lego/lego.urdf", [0.5, 0.05, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
-        # self.objectId = p.loadURDF("sphere_small.urdf", [0.55, 0, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
-        # self.objectId = p.loadURDF("sphere_small.urdf", [0.55, 0, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
-        # self.objectId = p.loadURDF("jenga/jenga.urdf", [0.4, -0.1, 0.45], p.getQuaternionFromEuler([0.0, 0.0, 0.0]))
+        # self.objectId = p.loadURDF("urdf/mug.urdf", [0.5, 0.0, 0.45], p.getQuaternionFromEuler([0.0, 0.0, -np.pi/6]))
+        # self.objectId = p.loadURDF("lego/lego.urdf", [0.5, 0.05, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
+        self.objectId = p.loadURDF("jenga/jenga.urdf", [0.5, 0.05, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
+
+        # self.objectId = p.loadURDF("sphere_small.urdf", [0.5, 0.07, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
+        # p.changeVisualShape(self.objectId, -1, rgbaColor=[0, 1, 1, 1])
         
         # for i in range(10):
-        #     p.loadURDF("domino/domino.urdf", [0.55 + i/25, -0.05, 0.45], [0,0,0,1])
+        #     p.loadURDF("domino/domino.urdf", [0.55 + i/25, 0.07 - i/25, 0.45], p.getQuaternionFromEuler([0.0, 0.0, -np.pi/4]))
 
 
         self.eefDebugLines = [[-1,(1,0,0),[1,0,0]], [-1,(0,1,0),[0,1,0]], [-1,(0,0,1),[0,0,1]]] #list of [id, dir, colour]  pos is fixed to eef position
@@ -237,19 +238,18 @@ class FrankaArmEnvironment:
         Get camera snapshot as mounted on end effector
         Returns: (width, height, rgb, depthBuffer, segmentation)
           width, height :: int, of all images
-          rgb :: numpy array of rgb values 0-255
-          depthBuffer :: numpy array of depth proportions 0-255. To calculate actual depth pass to env.calculateDepthFromBuffer()
-          segmentation :: numpy array of segmentation map   TODO: work out the range of values, i dont actually use this anywhere yet
+          rgba :: numpy array of rgba values 0-255
+          depthBuffer :: numpy array of depth proportions 0-1. 0 corresponds to near plane, 1 corresponds to far plane
+          segmentation :: numpy array of segmentation map. Values range over all object ids. (0-num objects in simulation)
         """
         viewMatrix = self.robotGetCameraViewMatrix()
 
         width, height, rgbPixels, depthPixels, segmentationBuffer = p.getCameraImage(self.imgSize, self.imgSize, viewMatrix, self.projectionMatrix)
-        rgb = np.array(rgbPixels).reshape((width, height, 4)).astype(np.uint8)
+        rgba = np.array(rgbPixels).reshape((width, height, 4)).astype(np.uint8)
         depthBuffer = np.array(depthPixels).reshape((width, height))
         segmentation = np.array(segmentationBuffer).reshape((width, height))
-        #segmentation = segmentation * 1.0 / 255.0
         
-        return (width, height, rgb, depthBuffer, segmentation, viewMatrix)
+        return (width, height, rgba, depthBuffer, segmentation, viewMatrix)
 
 
     def robotSaveCameraSnapshot(self, filename, path="", rgb=None, depthBuffer=None, vm=None):
@@ -257,7 +257,7 @@ class FrankaArmEnvironment:
         Filename should NOT include a file extension
         Path: Optional relative path to folder
         Can pass rgb AND depth AND vm or automatically call robotGetCameraSnapshot if not provided
-          If any are not provided, both will be overwritten with an internal call
+          If any are not provided, all will be overwritten with an internal call
         """
         if (rgb is None) or (depthBuffer is None):
             _, _, rgb, depthBuffer, _, vm = self.robotGetCameraSnapshot()
