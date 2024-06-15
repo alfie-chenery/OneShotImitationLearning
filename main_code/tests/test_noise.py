@@ -120,9 +120,17 @@ def actualTransform(item):
         t = [0, 0.05, 0]
         E = [0, 0, np.pi/6]
 
+    if item == "Ball":
+        t = [-0.1, 0.07, 0]
+        E = [0, 0, 0]
+
     if item == "Jenga":
         t = [0.1, 0.15, 0]
         E = [0, 0, -np.pi/6]
+
+    if item == "Dominoes":
+        t = [0.05, 0.07, 0]
+        E = [0, 0, -np.pi/4]
 
     R = env.getMatrixFromEuler(E)
     return (np.array(t), R, np.array(E))
@@ -138,9 +146,17 @@ def extractIdealKeypoints(item):
         points_demo = [(447,456), (452,662), (504,663), (505,455), (657,372), (699,317), (726,256), (735,186), (726,118), (701,56), (246,45), (216,112), (207,185), (216,255), (244,320), (284, 372)]     #[0.5, 0.05, 0.45] [0,0,0]
         points_live = [(315,723), (224,858), (291,885), (370,753), (538,765), (603,738), (659,694), (701,638), (726,578), (734,510), (339,281), (287,320), (242,378), (215,442), (207,509), (215,577)]    #[0.5, 0, 0.45] [0,0,pi/6]
     
+    if item == "Ball":
+        points_demo = [(25,640), (55,640), (190,517), (190,502), (47,379), (30,379), (87, 561)]      #[0.6, 0, 0.45] [0,0,pi/3]
+        points_live = [(470,957), (498,957), (614,830), (614,805), (493,682), (476,681), (570,899)]  #[0.5, 0.07, 0.45] [0,0,pi/3]
+
     if item == "Jenga":
         points_demo = [(770,389), (976,389), (765,106), (795,128), (814,128), (814,282), (822,282), (822,128), (841,128), (841,106), (870,152), (870,174), (870,262), (871,285), (910,154), (903,154), (903,331), (911,311), (911,272), (921,262), (922,174), (911,167)]  #[0.4, -0.1,  0.45] [0, 0, pi/2]
         points_live = [(239,728), (417,831), (401,495), (390,514), (407,524), (330,658), (336,662), (413,528), (431,537), (442,518), (445,573), (433,592), (389,668), (377,688), (477,595), (472,591), (383,743), (389,748), (419,698), (433,693), (477,618), (473,605)]  #[0.5, 0.05, 0.45] [0, 0, pi/3]
+
+    if item == "Dominoes":
+        points_demo = [(496,571), (482,571), (466,571), (496,449), (482,449), (466,449), (304,570), (289,570), (289,449), (274,449)]  #[0.5, 0, 0.45] [0,0,0]
+        points_live = [(207,900), (197,890), (187,880), (294,814), (283,804), (273,794), (15,708), (5,697), (90,611), (80,601)]       #[0.55, 0.07, 0.45] [0, 0, -pi/4]
 
     return (points_live, points_demo)
 
@@ -205,20 +221,25 @@ def rotation_error(predicted, truth):
 
 
 
-# SELECT WHICH TEST TO RUN
-noise_mode = "coordinate_noise"  #["coordinate_noise", "pixel_noise"]
-
-
-
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f"Device: {device}")
 
 env = environment.FrankaArmEnvironment(videoLogging=False, out_dir=dir_path+"\\out")
 env.robotGetCameraSnapshot()
 
+np.random.seed(17)  # For reproduceable results across different graphs, can set to any seed you want
+
+
+noise_mode = "coordinate_noise"  #["coordinate_noise", "pixel_noise"]
+shift_error = False    #shift the lines so that the error with 0 noise is 0. Essentially remove error due to human error in keypoints and numerical errors
+
+numRuns = 1000 if noise_mode == "pixel_noise" else 100 #100
+items = ["Lego", "Mug", "Ball", "Jenga", "Dominoes"]
+noiseAmounts = [0] + (list(range(0,21,2)) if noise_mode == "pixel_noise" else np.arange(0, 0.2, 0.001).tolist())
+results = ([],[],[],[],[])
 
 with open(dir_path + f"\\results-{noise_mode}.txt", 'w') as f:
-    for item in ["Lego", "Mug"]: #, "Ball", "Jenga", "Dominoes"]:
+    for index, item in enumerate(items):
         print(item)
 
         actual_t, actual_R, actual_E = actualTransform(item)
@@ -232,11 +253,11 @@ with open(dir_path + f"\\results-{noise_mode}.txt", 'w') as f:
         print(f"actual_E: {actual_E}", file=f)
         print(f"actual_R: {actual_R}\n", file=f)
 
-        for low, high in [(0,0),(0,0.001),(0,0.01),(0,0.1)]:
+        for low, high in zip(noiseAmounts, noiseAmounts[1:]):
             ts = []
             Rs = []
             Es = [] #euler angles of R
-            for i in range(1 if (low == 0 and high == 0) else 1000):
+            for i in range(1 if (low == 0 and high == 0) else numRuns):
                 points_live, points_demo = extractIdealKeypoints(item)
 
                 if noise_mode == "pixel_noise":
@@ -257,7 +278,7 @@ with open(dir_path + f"\\results-{noise_mode}.txt", 'w') as f:
             avg_t_err = np.mean(errors, axis=0)
 
             errors = [distance_error(t,actual_t) for t in ts]
-            avg_t_dist = np.mean(errors, axis=0)
+            avg_t_dist = np.mean(errors)
 
             errors = [rotation_error(R,actual_R) for R in Rs]
             avg_R_err = np.mean(errors)
@@ -266,7 +287,7 @@ with open(dir_path + f"\\results-{noise_mode}.txt", 'w') as f:
             avg_E_err = np.mean(errors, axis=0)
 
             errors = [distance_error(E,actual_E) for E in Es]
-            avg_E_dist = np.mean(errors, axis=0)
+            avg_E_dist = np.mean(errors)
 
             print(f"low={low}, high={high}:", file=f)
             print(f"avg t error: {avg_t_err}", file=f)
@@ -274,8 +295,41 @@ with open(dir_path + f"\\results-{noise_mode}.txt", 'w') as f:
             print(f"avg E error: {avg_E_err}", file=f)
             print(f"avg E distance: {avg_E_dist}", file=f)
             print(f"avg R error: {avg_R_err}\n", file=f)
+
+            if shift_error:
+                #Shift results so that the initial error is 0
+                if len(results[index]) == 0:
+                    results[index].append(avg_t_dist)
+                else:
+                    results[index].append(avg_t_dist - results[index][0])
+            else:
+                results[index].append(avg_t_dist)
             
         print("\n\n", file=f)
+
+
+if shift_error:
+    #Shift results so that the initial error is 0
+    for item in range(len(results)):
+        results[item][0] = 0
+
+
+xs = [(low + high) / 2 for (low, high) in zip(noiseAmounts, noiseAmounts[1:])]
+
+for item in range(len(results)):
+    plt.plot(xs, results[item], label=items[item])
+
+plt.title('Plot of translation error as keypoint noise increases')
+plt.ylabel('Error distance (metres)')
+# plt.ylim(0, np.max(np.array(results)))
+plt.legend(loc="upper left")
+plt.xlabel("Noise (meters)" if noise_mode == "coordinate_noise" else "Noise (pixels)")
+
+# if noise_mode == "coordinate_noise":
+#     plt.xscale("log")
+
+plt.savefig(dir_path + "\\fig_" + noise_mode + ".png")
+plt.show()
 
 
 env.closeEnv()
