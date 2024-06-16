@@ -125,7 +125,7 @@ def actualTransform(item):
         E = [0, 0, 0]
 
     if item == "Jenga":
-        t = [0.09, 0.15, 0]
+        t = [0.09, 0.1, 0]
         E = [0, 0, -np.pi/6]
 
     if item == "Dominoes":
@@ -151,8 +151,8 @@ def extractIdealKeypoints(item):
         points_live = [(470,957), (498,957), (614,830), (614,805), (493,682), (476,681), (570,899)]  #[0.5, 0.07, 0.45] [0,0,pi/3]
 
     if item == "Jenga":
-        points_demo = [(770,389), (976,389), (765,106), (795,128), (814,128), (814,282), (822,282), (822,128), (841,128), (841,106), (870,152), (870,174), (870,262), (871,285), (910,154), (903,154), (903,331), (911,311), (911,272), (921,262), (922,174), (911,167)]  #[0.41, -0.1,  0.45] [0, 0, pi/2]
-        points_live = [(239,728), (417,831), (401,495), (390,514), (407,524), (330,658), (336,662), (413,528), (431,537), (442,518), (445,573), (433,592), (389,668), (377,688), (477,595), (472,591), (383,743), (389,748), (419,698), (433,693), (477,618), (473,605)]  #[0.5, 0.05, 0.45] [0, 0, pi/3]
+        points_demo = [(770,389), (976,389), (795,106), (795,128), (814,128), (814,282), (822,282), (822,128), (841,128), (841,106), (870,152), (870,174), (870,262), (871,285), (910,154), (903,154), (903,331), (911,331), (911,272), (921,262), (922,174), (911,167)]  #[0.41, -0.1,  0.45] [0, 0, pi/2]
+        points_live = [(239,728), (417,831), (401,495), (390,514), (407,524), (330,658), (336,662), (413,528), (431,537), (442,518), (445,573), (433,592), (389,668), (377,688), (477,595), (472,591), (383,743), (389,748), (419,698), (433,693), (477,618), (473,605)]  #[0.5, 0.0, 0.45] [0, 0, pi/3]
 
     if item == "Dominoes":
         points_demo = [(496,571), (482,571), (466,571), (496,449), (482,449), (466,449), (304,570), (289,570), (289,449), (274,449)]  #[0.5, 0, 0.45] [0,0,0]
@@ -237,11 +237,13 @@ np.random.seed(17)  # For reproduceable results across different graphs, can set
 
 #============================================================================================
 noise_mode = "coordinate_noise"  #["coordinate_noise", "pixel_noise"]
-shift_error = True    #shift the lines so that the error with 0 noise is 0. Essentially remove human error in keypoints and numerical errors
+shift_error = False    #shift the lines so that the error with 0 noise is 0. Essentially remove human error in keypoints and numerical errors
+line_of_best_fit = False
 
-numRuns = 1000 if noise_mode == "pixel_noise" else 100 #100
+numRuns = 1000 if noise_mode == "pixel_noise" else 100
 items = ["Lego", "Mug", "Ball", "Jenga", "Dominoes"]
-noiseAmounts = [0] + (list(range(0,21,2)) if noise_mode == "pixel_noise" else np.arange(0, 0.2, 0.001).tolist())
+colours = ["tab:olive", "tab:red", "tab:blue", "tab:purple", "tab:green"]
+noiseAmounts = [0] + (list(range(0,22,2)) if noise_mode == "pixel_noise" else np.arange(0, 0.2, 0.001).tolist())
 #=============================================================================================
 
 results = ([],[],[],[],[])
@@ -324,20 +326,31 @@ with open(dir_path + f"\\results-{noise_mode}.txt", 'w') as f:
 
 if shift_error:
     #Shift results so that the initial error is 0
-    for item in range(len(results)):
-        results[item][0] = 0
+    for index in range(len(results)):
+        results[index][0] = 0
 
 
-xs = [(low + high) / 2 for (low, high) in zip(noiseAmounts, noiseAmounts[1:])]
+xs = np.array([(low + high) / 2 for (low, high) in zip(noiseAmounts, noiseAmounts[1:])])
 
-for item in range(len(results)):
-    plt.plot(xs, results[item], label=items[item])
+for index in range(len(results)):
+    alpha = 0.5 if line_of_best_fit else 1.0
+    plt.plot(xs, results[index], label=items[index], color=colours[index], alpha=alpha)
 
-plt.title('Plot of translation error as keypoint noise increases')
-plt.ylabel('Error magnitude (radians)')
+    if line_of_best_fit:
+        m, c = np.polyfit(xs, results[index], 1)
+        plt.plot(xs, m * xs + c, color=colours[index], linestyle='--')
+        print(f"{items[index]}: {m}x + {c}")
+
+plt.title("Plot of translation error as keypoint noise increases")
+
+if shift_error:
+    plt.ylabel(f"Mean error magnitude over {numRuns} runs (meters)")
+else:
+    plt.ylabel(f"Mean total error magnitude over {numRuns} runs (meters)")
+
 # plt.ylim(0, np.max(np.array(results)))
 plt.legend(loc="upper left")
-plt.xlabel("Noise (meters)" if noise_mode == "coordinate_noise" else "Noise (pixels)")
+plt.xlabel("Mean noise added " + ("(meters)" if noise_mode == "coordinate_noise" else "(pixels)"))
 
 # if noise_mode == "coordinate_noise":
 #     plt.xscale("log")

@@ -25,11 +25,26 @@ image_transforms = T.Compose([
     T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
 ])
 
+# window_size = (1024, 1024)
+# cell_size = (16, 16)
+# block_size = (32, 32)    # 2x2 cells
+# block_stride = (16, 16)  # block_size / 2
+# num_bins = 9
+# hog = cv2.HOGDescriptor(window_size, block_size, block_stride, cell_size, num_bins)
+
 def embedImage(path):
     img = Image.open(path)
     img = image_transforms(img)
     img = img.unsqueeze(0)
     emb = dino(img)
+
+    # img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+    # emb = hog.compute(img)
+    # emb = torch.from_numpy(emb)
+    # emb = emb.unsqueeze(0)
+    
+    # print(emb.shape)
+
     return emb
 
 def loadEmbeddings():
@@ -57,7 +72,8 @@ def loadDemo(name):
     vmPath = dir_path + f"\\demonstrations\\{name}-vm.pkl"
     tracePath = dir_path + f"\\demonstrations\\{name}.pkl"
 
-    rgb = cv2.imread(rgbPath, cv2.IMREAD_GRAYSCALE)
+    rgb = cv2.imread(rgbPath) #, cv2.IMREAD_GRAYSCALE)
+    rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
     with open(depthPath, 'rb') as f:
         depth = pickle.load(f)
     with open(vmPath, 'rb') as f:
@@ -186,23 +202,30 @@ def extractCorrespondingKeypoints(img_live, img_init, displayMatches=True):
     matchesGMS = sorted(matchesGMS, key=lambda x:x.distance)
     # d = [x.distance for x in matchesGMS]
     # dd = [b-a for (b,a) in zip(d[1:], d)]
-    # # plt.plot(d, 'b-')
-    # plt.plot(dd, 'r-')
-    # plt.title('Plot of finite difference of match distance')
+    # plt.plot(d, "b-", label="Match distance from mean")
+    # plt.plot(dd, "r-", label="Finite difference of match distance from mean")
+    # plt.title('Match distance from mean match in sorted list')
     # plt.xlabel('Index of sorted list')
     # plt.ylabel('Difference (Radians)')
+    # plt.legend(loc="upper left")
+    # plt.savefig(dir_path + "\\out\\fig.png")
     # plt.show()
-    # displayMatches = False
 
-    # n = len(matchesGMS)
-    # matchesGMS = matchesGMS[:n//2] # take only the best half of matches
-    #matchesGMS = matchesGMS[:500]
+    n = len(matchesGMS)
+    matchesGMS = matchesGMS[:3*n//4] # take only the best 3/4 of matches
+    # matchesGMS = matchesGMS[:1000]
     
 
     if displayMatches:
-        matchImg = cv2.drawMatches(img_live, kp_live, img_init, kp_init, matchesGMS, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+        width = 2 # pixels
+        divider = np.full((img_live.shape[0], width, 4), 0, dtype=np.uint8)
+        divider[:,:,3] = 255
+        img_live_divider = np.hstack((img_live, divider))
+
+        matchImg = cv2.drawMatches(img_live_divider, kp_live, img_init, kp_init, matchesGMS, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         plt.figure(figsize = (8,6))
         plt.imshow(matchImg)
+        plt.savefig(dir_path + "\\out\\matches.png")
         plt.pause(0.01)
 
     #Extract matching coordinates
