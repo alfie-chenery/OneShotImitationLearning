@@ -32,9 +32,9 @@ class FrankaArmEnvironment:
         self.robotId = p.loadURDF("franka_panda/panda.urdf", [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0], useFixedBase=True)
         self.tableId = p.loadURDF("table/table.urdf", [0.6, 0.0, -0.2], p.getQuaternionFromEuler([0.0, 0.0, np.pi/2]), useFixedBase=True)
 
-        # self.objectId = p.loadURDF("urdf/mug.urdf", [0.5, 0.0, 0.45], p.getQuaternionFromEuler([0.0, 0.0, -np.pi/6]))
+        self.objectId = p.loadURDF("urdf/mug.urdf", [0.5, 0.0, 0.45], p.getQuaternionFromEuler([0.0, 0.0, -np.pi/6]))
         # self.objectId = p.loadURDF("lego/lego.urdf", [0.5, 0.05, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
-        self.objectId = p.loadURDF("jenga/jenga.urdf", [0.5, 0.05, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
+        # self.objectId = p.loadURDF("jenga/jenga.urdf", [0.5, 0.0, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
 
         # self.objectId = p.loadURDF("sphere_small.urdf", [0.5, 0.07, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
         # p.changeVisualShape(self.objectId, -1, rgbaColor=[0, 1, 1, 1])

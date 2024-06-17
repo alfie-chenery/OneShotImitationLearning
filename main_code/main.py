@@ -15,6 +15,26 @@ class NoKeypointsException(Exception):
     pass
 
 
+def distance_error(predicted, truth):
+    return np.linalg.norm(predicted - truth)
+
+
+def vector_error(predicted, truth):
+    return predicted - truth
+
+
+def rotation_error(predicted, truth, degrees=False):
+    rel_R = np.dot(predicted.T, truth) # Compute the relative rotation matrix
+    cos_theta = (np.trace(rel_R) - 1) / 2 # Compute the angle using the trace of the relative rotation matrix
+    # cos_theta = np.clip(cos_theta, -1, 1)
+    theta = np.arccos(cos_theta)
+
+    if degrees:
+        theta = theta * 180/np.pi
+
+    return theta
+
+
 dir_path = os.path.dirname(os.path.realpath(__file__))
 dino = torch.hub.load('facebookresearch/dino:main', 'dino_vitb8')
 
@@ -178,7 +198,10 @@ def extractCorrespondingKeypoints(img_live, img_init, displayMatches=True):
     #TODO remove any matches which match between different objects using segmentation map
 
     # GMS (Grid-based Motion Statistics) algorithm refines the guesses for high quality matches
-    matchesGMS = cv2.xfeatures2d.matchGMS(img_live.shape[:2], img_init.shape[:2], kp_live, kp_init, matches, withRotation=True, withScale=False)
+    if gms:
+        matchesGMS = cv2.xfeatures2d.matchGMS(img_live.shape[:2], img_init.shape[:2], kp_live, kp_init, matches, withRotation=True, withScale=False)
+    else:
+        matchesGMS = matches
 
     if len(matchesGMS) == 0:
         raise NoKeypointsException("Could not match any keypoints")
@@ -212,8 +235,15 @@ def extractCorrespondingKeypoints(img_live, img_init, displayMatches=True):
     # plt.show()
 
     n = len(matchesGMS)
-    matchesGMS = matchesGMS[:3*n//4] # take only the best 3/4 of matches
+
+    if filter:
+        m = (3 * n)//4 # n//2
+        matchesGMS = matchesGMS[:m] # take only the best 3/4 of matches
     # matchesGMS = matchesGMS[:1000]
+
+    print()
+    print(len(matchesGMS))
+    print()
     
 
     if displayMatches:
@@ -227,6 +257,7 @@ def extractCorrespondingKeypoints(img_live, img_init, displayMatches=True):
         plt.imshow(matchImg)
         plt.savefig(dir_path + "\\out\\matches.png")
         plt.pause(0.01)
+        plt.show()
 
     #Extract matching coordinates
     points_live, points_init = [], []
@@ -246,12 +277,19 @@ print(f"Device: {device}")
 
 env = environment.FrankaArmEnvironment(videoLogging=False, out_dir=dir_path+"\\out")
 
-keypointExtracter = cv2.ORB_create(10000, fastThreshold=0)
-#keypointExtracter = cv2.SIFT_create()
-keypointMatcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-#keypointMatcher = cv2.BFMatcher()
+# keypointExtracter = cv2.ORB_create(10000, fastThreshold=0)
+keypointExtracter = cv2.SIFT_create()
+# keypointMatcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+keypointMatcher = cv2.BFMatcher(crossCheck=True)
 
-drawKeypointsInWorld = True
+drawKeypointsInWorld = False
+showMatches = True
+
+gms = True
+filter = False
+
+ideal_t = np.array([0.05, 0.07, 0])
+ideal_R = env.getMatrixFromEuler([0, 0, -np.pi/4])
 
 
 # plt.ion()
@@ -282,12 +320,7 @@ while error > ERR_THRESHOLD: # or iter < 2:
     _, _, live_rgb, live_depth, _, live_vm = env.robotGetCameraSnapshot()
     
     try:
-        points_live, points_demo = extractCorrespondingKeypoints(live_rgb, demo_rgb, displayMatches=True)
-
-        #TESTING
-        # points_demo = [(10, 445),(140, 445),(10, 574),(140, 574)]
-        # points_live = [(421, 650),(551, 650),(421, 779),(551, 779)] #0.5, 0.05 unrotated
-        #points_live = [(401, 738),(462, 629), (508, 800), (570, 693)] #0.5, 0.05, rotated pi/3
+        points_live, points_demo = extractCorrespondingKeypoints(live_rgb, demo_rgb, displayMatches=showMatches)
 
         points_live = convertToWorldCoords(points_live, live_depth, live_vm)
         points_demo = convertToWorldCoords(points_demo, demo_depth, demo_vm)
@@ -315,8 +348,8 @@ while error > ERR_THRESHOLD: # or iter < 2:
         print(f"Error: {error}")
 
         # After finding keypoints, wait so we can check the correspondence image
-        print("Press Space to continue...")
-        keyboard.wait("space")
+        # print("Press Space to continue...")
+        # keyboard.wait("space")
 
         env.robotMoveEefPosition(t,R)
         
@@ -353,7 +386,10 @@ for i in range(50):
 
 print(f"Alligned offset:\n  Translation:{offset_pos},\n  Rotation (matrix):\n{offset_ornMat}\n Rotation (euler):{env.getEulerFromMatrix(offset_ornMat)}\n")
 
-
+print()
+print(distance_error(offset_pos, ideal_t))
+print(rotation_error(offset_ornMat, ideal_R, degrees=True))
+print()
 
 
 
@@ -367,7 +403,7 @@ for keyFrame in range(len(demo_trace)):
 
 
 
-for _ in range(100):
+for _ in range(200):
     env.stepEnv()
 
 # env.closeEnv()

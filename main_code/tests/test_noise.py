@@ -118,7 +118,7 @@ def actualTransform(item):
         
     if item == "Mug":
         t = [0, 0.05, 0]
-        E = [0, 0, np.pi/6]
+        E = [0, 0, -np.pi/6]
 
     if item == "Ball":
         t = [-0.1, 0.07, 0]
