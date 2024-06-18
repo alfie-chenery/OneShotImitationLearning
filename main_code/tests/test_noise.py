@@ -179,7 +179,7 @@ def addKeypointNoise(points, low, high):
         assert np.isclose(np.linalg.norm(randomVector), 1.0) #should be unit vector
 
         randomVector *= randomMagnitude
-        points[i] = (points[i][0] + randomVector[0], points[i][1] + randomVector[1])
+        points[i] = (np.clip(points[i][0] + randomVector[0],0,1023), np.clip(points[i][1] + randomVector[1],0,1023))
 
     return points
 
@@ -236,14 +236,16 @@ env.robotGetCameraSnapshot()
 np.random.seed(17)  # For reproduceable results across different graphs, can set to any seed you want
 
 #============================================================================================
-noise_mode = "coordinate_noise"  #["coordinate_noise", "pixel_noise"]
+noise_mode = "pixel_noise"  #["coordinate_noise", "pixel_noise"]
+metric = "translation"              #["translation", "rotation"]
 shift_error = False    #shift the lines so that the error with 0 noise is 0. Essentially remove human error in keypoints and numerical errors
 line_of_best_fit = False
 
 numRuns = 1000 if noise_mode == "pixel_noise" else 100
 items = ["Lego", "Mug", "Ball", "Jenga", "Dominoes"]
 colours = ["tab:olive", "tab:red", "tab:blue", "tab:purple", "tab:green"]
-noiseAmounts = [0] + (list(range(0,22,2)) if noise_mode == "pixel_noise" else np.arange(0, 0.2, 0.001).tolist())
+noiseAmounts = [0] + (np.arange(0, 20.1, 0.1).tolist() if noise_mode == "pixel_noise" else np.arange(0, 0.201, 0.001).tolist())
+#list(range(0,21,1))
 #=============================================================================================
 
 results = ([],[],[],[],[])
@@ -306,12 +308,8 @@ with open(dir_path + f"\\results-{noise_mode}.txt", 'w') as f:
             print(f"avg E distance: {avg_E_dist}", file=f)
             print(f"avg R error: {avg_R_err}\n", file=f)
 
-            #=======================================================
-            graph_metric = avg_R_err
-            #make sure to update graph labels if you change this
-            #========================================================
+            graph_metric = avg_t_dist if metric == "translation" else avg_R_err
             
-
             if shift_error:
                 #Shift results so that the initial error is 0
                 if len(results[index]) == 0:
@@ -333,20 +331,17 @@ if shift_error:
 xs = np.array([(low + high) / 2 for (low, high) in zip(noiseAmounts, noiseAmounts[1:])])
 
 for index in range(len(results)):
-    alpha = 0.5 if line_of_best_fit else 1.0
+    # alpha = 0.5 if line_of_best_fit else 1.0
+    alpha = 0.5
     plt.plot(xs, results[index], label=items[index], color=colours[index], alpha=alpha)
 
     if line_of_best_fit:
         m, c = np.polyfit(xs, results[index], 1)
-        plt.plot(xs, m * xs + c, color=colours[index], linestyle='--')
+        plt.plot(xs, m * xs + c, color=colours[index]) #, linestyle='--')
         print(f"{items[index]}: {m}x + {c}")
 
-plt.title("Plot of translation error as keypoint noise increases")
-
-if shift_error:
-    plt.ylabel(f"Mean error magnitude over {numRuns} runs (meters)")
-else:
-    plt.ylabel(f"Mean total error magnitude over {numRuns} runs (meters)")
+plt.title("Plot of " + metric + " error as keypoint noise increases")
+plt.ylabel(f"Mean error magnitude over {numRuns} runs " + ("(meters)" if metric == "translation" else "(degrees)"))
 
 # plt.ylim(0, np.max(np.array(results)))
 plt.legend(loc="upper left")
@@ -355,7 +350,7 @@ plt.xlabel("Mean noise added " + ("(meters)" if noise_mode == "coordinate_noise"
 # if noise_mode == "coordinate_noise":
 #     plt.xscale("log")
 
-plt.savefig(dir_path + "\\fig_" + noise_mode + ".png")
+plt.savefig(f"{dir_path}\\fig_{noise_mode}-{metric}.png")
 plt.show()
 
 

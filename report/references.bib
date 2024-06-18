@@ -1,5 +1,5 @@
 %1
-@online{pybullet,
+@misc{pybullet,
   author = {Erwin Coumans and Yunfei Bai},
   title = {PyBullet, a Python module for physics simulation for games, robotics and machine learning},
   year = {2016-2021},
@@ -21,11 +21,26 @@
     author = {Fernando Reyes and Rafael Kelly}
 }
 
+@article{rl,
+    author={Montague, P. Read and Dayan, Peter and Person, Christophe and Sejnowski, Terrence J.},
+    title={Bee foraging in uncertain environments using predictive hebbian learning},
+    journal={Nature},
+    year={1995},
+    month={Oct},
+    day={01},
+    volume={377},
+    number={6551},
+    pages={725-728},
+    issn={1476-4687},
+    doi={10.1038/377725a0},
+    url={https://doi.org/10.1038/377725a0}
+}
+
 %3
-@book{reinforcement-learning,
+@book{rl-intro-book,
     author = {Richard S. Sutton and Andrew G. Barto},
     title = {Reinforcement Learning: An Introduction},
-    chapter = 4,
+    chapter = {3-6},
     publisher = {MIT Press},
     year = 2018
 }
@@ -46,9 +61,17 @@
     year={2023}
 }
 
+
+@inproceedings{coarse-to-fine,
+    title={Coarse-to-Fine Imitation Learning: Robot Manipulation from a Single Demonstration},
+    author={Johns, Edward},
+    booktitle={IEEE International Conference on Robotics and Automation (ICRA)},
+    year={2021}
+}
+
 %6
 @unpublished{inverse-rl,
-    author = {Feiyang Wu, Zhaoyuan Gu, Hanran Wu, Anqi Wu, Ye Zhao},
+    author = {Feiyang Wu and Zhaoyuan Gu and Hanran Wu and Anqi Wu and Ye Zhao},
     title = {Infer and Adapt: Bipedal Locomotion Reward Learning from Demonstrations via Inverse Reinforcement Learning},
     year={2023},
     url = {https://arxiv.org/abs/2309.16074}
@@ -56,7 +79,7 @@
 
 %7
 @unpublished{mimicgen,
-    author = {Ajay Mandlekar, Soroush Nasiriany, Bowen Wen, Iretiayo Akinola, Yashraj Narang, Linxi Fan, Yuke Zhu, Dieter Fox},
+    author = {Ajay Mandlekar and Soroush Nasiriany and Bowen Wen and Iretiayo Akinola and Yashraj Narang and Linxi Fan and Yuke Zhu and Dieter Fox},
     title = {
     MimicGen: A Data Generation System for Scalable Robot Learning using Human Demonstrations},
     year={2023},
@@ -64,7 +87,7 @@
 }
 
 %8
-@online{quaternions,
+@misc{quaternions,
     author = {Sir William Rowan Hamilton},
     title = {On quaternions, or on a new system of imaginaries in algebra},
     year = {1844-1850},
@@ -72,11 +95,13 @@
 }
 
 %9
-@online{orientations,
-    author = {James Diebel},
-    title = {Representing attitude: Euler angles, unit quaternions, and rotation vectors},
+@article{orientations,
+    author = {Diebel, James},
     year = {2006},
-    url ={https://www.astro.rug.nl/software/kapteyn-beta/_downloads/attitude.pdf}
+    month = {01},
+    title = {Representing Attitude: Euler Angles, Unit Quaternions, and Rotation Vectors},
+    volume = {58},
+    journal = {Matrix}
 }
 
 %10
@@ -88,7 +113,7 @@
 }
 
 %11
-@online{euler-theorem,
+@misc{euler-theorem,
     author = {Leonhard Euler},
     title = {General formulas for any translation of rigid bodies},
     year = {1776},
@@ -97,7 +122,7 @@
 }
 
 %12
-@online{ndc,
+@misce{ndc,
     author = {Nathan Reed},
     title = {World coordinates, Normalised device coordinates and device coordinates. [Computer graphics stack exchange]},
     year = {2015},
@@ -105,17 +130,17 @@
 }
 
 %13
-@online{uniform-3d-vector,
+@misc{uniform-3d-vector,
     author = {Weisstein, Eric W},
-    title = {"Sphere Point Picking." From MathWorld--A Wolfram Web Resource},
+    title = {Sphere Point Picking From MathWorld--A Wolfram Web Resource},
     url ={https://mathworld.wolfram.com/SpherePointPicking.html},
     note = {[Accessed on 2024-06-10]}
 }
 
 %14
-@online{cylinder-proj,
+@misc{cylinder-proj,
     author = {Jim Belk},
-    title = {How to find a random axis or unit vector in 3D? [Maths stack exchange]},
+    title = {How to find a random axis or unit vector in 3D? From Maths stack exchange},
     year = {2011},
     url ={https://math.stackexchange.com/questions/44689/how-to-find-a-random-axis-or-unit-vector-in-3d},
     note = {[Accessed on 2024-06-10]}
@@ -155,16 +180,16 @@
 }
 
 %17
-@online{homogenous-coords,
+@misc{homogenous-coords,
     author = {Tom Dalling},
-    title = {Explaining Homogeneous Coordinates & Projective Geometry},
+    title = {Explaining Homogeneous Coordinates \& Projective Geometry},
     year = {2014},
     url ={https://www.tomdalling.com/blog/modern-opengl/explaining-homogenous-coordinates-and-projective-geometry/},
     note = {[Accessed on 2024-06-12]}
 }
 
 %18
-@online{gimbal,
+@misc{gimbal,
     author = {Jonathan Strickland},
     title = {What is a gimbal -- and what does it have to do with NASA?},
     year = {2023},
@@ -174,8 +199,7 @@
 
 %19
 @article{gimbal-lock,
-    author={Hemingway, Evan G.
-    and O'Reilly, Oliver M.},
+    author={Hemingway, Evan G. and O'Reilly, Oliver M.},
     title={Perspectives on Euler angle singularities, gimbal lock, and the orthogonality of applied forces and applied moments},
     journal={Multibody System Dynamics},
     year={2018},
@@ -186,4 +210,157 @@
     doi={10.1007/s11044-018-9620-0},
     url={https://doi.org/10.1007/s11044-018-9620-0}
 }
+
+%20
+@techreport{hog-hand,
+    author = {William T. Freeman and Michal Roth},
+    title = {Orientation Histograms for Hand Gesture Recognition},
+    institution = {MERL - Mitsubishi Electric Research Laboratories},
+    address = {Cambridge, MA 02139},
+    number = {TR94-03},
+    year = {1994},
+    url = {https://www.merl.com/publications/TR94-03/}
+}
+
+%21
+@inproceedings{hog-object,
+    author={Dalal, N. and Triggs, B.},
+    booktitle={2005 IEEE Computer Society Conference on Computer Vision and Pattern Recognition (CVPR'05)}, 
+    title={Histograms of oriented gradients for human detection}, 
+    year={2005},
+    volume={1},
+    pages={886-893 vol. 1},
+    doi={10.1109/CVPR.2005.177}
+}
+
+%22
+@misc{hog-patent,
+    title={Method of and apparatus for pattern recognition},
+    author={R. K. McConnell},
+    month={Jan},
+    year={1986},
+    publisher={Google Patents},
+    note={U.S. Patent 4,567,610}
+}
+
+%23
+@inproceedings{GMS,
+    author={Bian, Jiawang and Lin, Wen-Yan and Matsushita, Yasuyuki and Yeung, Sai-Kit and Nguyen, Tan-Dat and Cheng, Ming-Ming},
+    booktitle={2017 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, 
+    title={GMS: Grid-Based Motion Statistics for Fast, Ultra-Robust Feature Correspondence}, 
+    year={2017},
+    pages={2828-2837},
+    doi={10.1109/CVPR.2017.302}
+}
+
+%24
+@article{SIFT,
+    author={Lowe, David G.},
+    title={Distinctive Image Features from Scale-Invariant Keypoints},
+    journal={International Journal of Computer Vision},
+    year={2004},
+    month={Nov},
+    day={01},
+    volume={60},
+    number={2},
+    pages={91-110},
+    issn={1573-1405},
+    doi={10.1023/B:VISI.0000029664.99615.94},
+    url={https://doi.org/10.1023/B:VISI.0000029664.99615.94}
+}
+
+%25
+@inproceedings{BRIEF,
+    author = {Calonder, Michael and Lepetit, Vincent and Strecha, Christoph and Fua, Pascal},
+    year = {2010},
+    month = {09},
+    pages = {778-792},
+    title = {BRIEF: Binary Robust Independent Elementary Features},
+    volume = {6314},
+    isbn = {978-3-642-15560-4},
+    journal = {Eur. Conf. Comput. Vis.},
+    doi = {10.1007/978-3-642-15561-1_56}
+}
+
+%26
+@inproceedings{FAST,
+    author={Rosten, Edward and Drummond, Tom},
+    title={Machine Learning for High-Speed Corner Detection},
+    booktitle={Computer Vision -- ECCV 2006},
+    year={2006},
+    publisher={Springer Berlin Heidelberg},
+    address={Berlin, Heidelberg},
+    pages={430-443},
+    isbn={978-3-540-33833-8}
+}
+
+%27
+@inproceedings{ORB,
+    author={Rublee, Ethan and Rabaud, Vincent and Konolige, Kurt and Bradski, Gary},
+    booktitle={2011 International Conference on Computer Vision}, 
+    title={ORB: An efficient alternative to SIFT or SURF}, 
+    year={2011},
+    pages={2564-2571},
+    doi={10.1109/ICCV.2011.6126544}
+}
+
+@article{behavioural-cloning,
+    title={Cognitive models from subcognitive skills},
+    author={Michie, Donald and Bain, Michael and Hayes-Miches, J},
+    journal={IEE control engineering series},
+    volume={44},
+    pages={71-99},
+    year={1990}
+}
+
+@inbook{behavioural-cloning-book,
+    author="Sammut, Caude",
+    title="Behavioral Cloning",
+    editor="Sammut, Claude and Webb, Geoffrey I.",
+    bookTitle="Encyclopedia of Machine Learning",
+    year="2010",
+    publisher="Springer US",
+    address="Boston, MA",
+    pages="93-97",
+    isbn="978-0-387-30164-8",
+    doi="10.1007/978-0-387-30164-8_69",
+    url="https://doi.org/10.1007/978-0-387-30164-8_69"
+}
+
+@inbook{rl-book,
+    author={Abbeel, Pieter and Ng, Andrew Y.},
+    title={Inverse Reinforcement Learning},
+    editor="Sammut, Claude and Webb, Geoffrey I.",
+    bookTitle={Encyclopedia of Machine Learning},
+    year={2010},
+    publisher={Springer US},
+    address={Boston, MA},
+    pages={554-558},
+    isbn={978-0-387-30164-8},
+    doi={10.1007/978-0-387-30164-8_417},
+    url={https://doi.org/10.1007/978-0-387-30164-8_417}
+}
+
+@misc{dagger,
+    title={A Reduction of Imitation Learning and Structured Prediction to No-Regret Online Learning}, 
+    author={Stephane Ross and Geoffrey J. Gordon and J. Andrew Bagnell},
+    year={2011},
+    eprint={1011.0686},
+    archivePrefix={arXiv},
+}
+
+@inproceedings{uncertainty-il,
+    author={Cui, Yuchen and Isele, David and Niekum, Scott and Fujimura, Kikuo},
+    booktitle={2019 International Conference on Robotics and Automation (ICRA)}, 
+    title={Uncertainty-Aware Data Aggregation for Deep Imitation Learning}, 
+    year={2019},
+    volume={},
+    number={},
+    pages={761-767},
+    doi={10.1109/ICRA.2019.8794025}
+}
+
+
+
+
 

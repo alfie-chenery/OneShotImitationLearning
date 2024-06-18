@@ -2,52 +2,195 @@
 \label{chap:evaluation}
 In this section, we evaluate the performance of our algorithm against a custom test suite. Our evaluation consists of two main tests designed to assess different aspects of the algorithm.\\
 In the first test we examine how well our modified Kabsch-Umeyama algorithm handles varying levels of noise helping us understand its stability and robustness to perform well even in noisy environments.\\
-The second test compares different key point matching algorithms by using them in a full run of the system and measuring their performance under identical environmental conditions. Following this test we will determine the best algorithm for use in our project, finalising the implementation design.
+The second test compares different keypoint matching algorithms by using them in a full run of the system and measuring their performance under identical environmental conditions. Following this test we will determine the best algorithm for use in our project, finalising the implementation design.
 
 \section{Sensitivity to noise}
+\label{sec:noise-test}
 %evaluate how the kabsch algorithm performs with noise applied to ideal keypoints
 In this test we want to understand how robust our modified Kabsch-Umeyama algorithm is to noise in the coordinates it receives. The hope is that small deviations to the coordinate inputs produce very small changes in the output translation and rotation matrix. If this is the case then the algorithm is robust to noise, and is more likely to produce good results when used in our system.\\
 
 %TODO should really make a bigger suite, update number if we do
-In order to conduct this test we create a test suite of 5 diverse objects and an accompanying demonstration for each one. We then manually mark an ideal set of key points in the demonstration image. These key points are recorded as a list of (x,y) pixel coordinate pairs. We also make sure to record the position and orientation of the object in the demonstration.
-We then place this same object in a different pose in the environment and save the live image from the robot in this case. Again making sure to note down the position and orientation of the object in this new scene. We then again manually mark the same key points but in this new image. It is important that we mark corresponding key points, so if in the demonstration we marked the corners of a cube, we must also mark the corners in the live image. The pixel location of these corners will just have moved. \reftab{tab:test-suite} shows the transformation between the demonstration and live object pose. We also disclose how many keypoints were manually marked for each object.\\
+In order to conduct this test we create a test suite of 5 diverse objects and an accompanying demonstration for each one. We then manually mark an ideal set of keypoints in the demonstration image. These keypoints are recorded as a list of (x,y) pixel coordinate pairs. We also make sure to record the position and orientation of the object in the demonstration.
+We then place this same object in a different pose in the environment and save the live image from the robot in this case. Again making sure to note down the position and orientation of the object in this new scene. We then again manually mark the same keypoints but in this new image. It is important that we mark corresponding keypoints, so if in the demonstration we marked the corners of a cube, we must also mark the corners in the live image. The pixel location of these corners will just have moved. \reftab{tab:test-suite} shows the transformation between the demonstration and live object pose. We also disclose how many keypoints were manually marked for each object. For further details about the specifics of the test suite, refer to \refapx{apx:test-suite}\\
 
 \begin{table}[h!t]
     \begin{adjustbox}{center}
-        \begin{tabular}{| V{5cm} || c | c | c |}
+    \renewcommand{\arraystretch}{1.2}
+        \begin{tabular}{| >{\columncolor{lightgray!25}}c | c | c | c |}
             \hline
             \rowcolor{lightgray!25}
-            Object & Translation applied & Rotation applied & Number of key points \\
+            Object & Translation applied & Rotation applied & Number of keypoints \\
             \hline
             Lego & [-0.1, 0.05, 0] & [0, 0, $\frac{\pi}{3}$] & 4\\
             \hline
             Mug & [0, 0.05, 0] & [0, 0, $\frac{\pi}{6}$] & 16\\
             \hline
-            Ball & [] & [] & \\
+            Ball & [-0.1, 0.07, 0] & [0, 0, 0] & 7\\
             \hline
-            Block & [0.1, 0.15, 0] & [0, 0, $-\frac{\pi}{6}$] & \\
+            Jenga & [0.09, 0.15, 0] & [0, 0, $-\frac{\pi}{6}$] & 22\\
             \hline
-            Domino & [0.05, 0.07, 0] & [0, 0, -$\frac{\pi}{4}$] & \\
+            Domino & [0.05, 0.07, 0] & [0, 0, -$\frac{\pi}{4}$] & 10\\
             \hline
         \end{tabular}
     \end{adjustbox}
     \caption{The true transformation between demo and live for each object in test suite}
     \label{tab:test-suite}  
-    \end{table}
+\end{table}
 
-Now we can pass the manually marked key points in the demonstration and live image to our modified Kabsch-Umeyama algroithm. This should output the exact translation and rotation between the object from the demonstration to the live scene, within a small tolerance of floating point accuracy. The purpose of using human provided, ground truth key points is to control any additional noise in the test. If we used our keypoint matching algorithm then it would be unclear how much error came from our randomly added noise, or from mismatches in the key point algorithm. As such we gain clearer results by using our ground truth key points.\\
+Now we can pass the manually marked keypoints in the demonstration and live image to our modified Kabsch-Umeyama algroithm. This should output the exact translation and rotation between the object from the demonstration to the live scene, within a small tolerance of floating point accuracy. The purpose of using human provided, ground truth keypoints is to control any additional noise in the test. If we used our keypoint matching algorithm then it would be unclear how much error came from our randomly added noise, or from mismatches in the keypoint algorithm. As such we gain clearer results by using our ground truth keypoints.\\
 
-With the method defined, we now add some noise to the ideal key points before passing them to the algorithm. We wish to compare how far the new output deviates from the true output when the noise is added. Since we add random noise, we conduct multiple runs and compute the average.\\
+With the method defined, we now add some noise to the ideal keypoints before passing them to the algorithm. We wish to compare how far the new output deviates from the true output when the noise is added. Since we add random noise, we conduct multiple runs and compute the average.
 
+\subsection{Coordinate noise}
 In this first set of tests the noise added is calculated as a random 3D unit vector multiplied by some random magnitude. The magnitude will be drawn from a uniform distribution, in the range $[a,b]$. Here $a$ and $b$ are used to control the upper and lower bounds on how much noise can be added. This allows us to perform multiple tests and compare the effects of increasingly large deviations.\\
-When computing the random 3D unit vector, we take care to use an \speech{equal area projection of the sphere onto a cylinder} \cite{uniform-3d-vector, cylinder-proj, random-vector}. This allows us to choose a point uniformly from the unit sphere, without experiencing a bunching of points at the poles. This random noise is applied to the world coordinates after they have been computed from the pixel coordinates. This gives us a solid grasp as to just how much noise can be present before the algorithm produces unsatisfactory results.\\
+When computing the random 3D unit vector, we take care to use an \speech{equal area projection of the sphere onto a cylinder} \cite{cylinder-proj}. This allows us to choose a point uniformly from the unit sphere, without experiencing a bunching of points at the poles \cite{uniform-3d-vector, random-vector}. This random noise is applied to the world coordinates after they have been computed from the pixel coordinates. This gives us a solid grasp as to just how much noise can be present before the algorithm produces unsatisfactory results.\\
 
-In the second set of tests we change how we apply the random noise to better emulate our system. Since the pixel to world coordinate calculations use the exact view matrix of the camera, the only errors in this part of the system are the result of very small floating point inaccuracies. The source of the error will be predominantly a result of the key point matching. As such in this second round of tests, we add noise to the pixel coordinates of the key points, before converting them to world coordinates. This is more representative of the type of error we will encounter in this system, and so proves a more reliable result.
+\begin{figure}[h]
+    \centering
+    \begin{subfigure}[t]{0.49\textwidth}
+        \includegraphics[width=\textwidth]{figures/fig_coordinate_noise-translation.png}
+        \caption{Noise graph for translation error}
+        \label{fig:noise-coord-translation}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.49\textwidth}
+        \includegraphics[width=\textwidth]{figures/fig_coordinate_noise-rotation.png}
+        \caption{Noise graph for rotation error}
+        \label{fig:noise-coord-rotation}
+    \end{subfigure}
+    \caption{Sensitivity analysis with added keypoint coordinate noise}
+    \label{fig:noise-coord}
+\end{figure}
+In these tests noise was added within a range of 0.001 meters. The point plotted at horizontal coordinate $x$ was the result of sampling the noise magnitude from the half open interval $[x-0.0005,\: x+0.0005)$. This is with the exception of the data point at $x=0$. This point is the error when no noise was added, as though sampling the noise magnitude from $[0,0).$
+
+\subsubsection{Translation error}
+We see in \reffig{fig:noise-coord-translation} that the magnitude of the error between the true translation and computed translation appear to follow linear trend lines for all of the objects. A key observation is that the lines do not all intersect with the origin. This conveys that even with no added noise, the computed translation is still not the true translation. This systematic error remains constant across all results for the same object, only affecting the vertical intercept of the line, and not the gradient. This systematic error can be attributed to two main causes. Slight numerical precision errors will be present in the algorithm. These are somewhat exacerbated by converting our keypoints to world coordinates first. As a result keypoints, which are often very close to each other, have coordinates which differ only in low order decimal places. However, the much larger contribution to this systematic error is human error. The ground truth keypoint matching was performed by a human, and as a result is subject to large inaccuracies. It can be very difficult to identify the exact pixel which correspond between the demonstration and live image, especially when rotations and perspective distort straight edges.\\
+
+For our test we are more concerned with how the error changes as a result of increasing the amount of noise the algorithm is subjected to. Therefore, we care more about the gradient of the trend lines than the true values. From this graph we can notice an interesting correlation. The gradient of each line is inversely proportional to the number of keypoints we marked. The Jenga block with the most keypoints is the most stable to additional noise, evident by possessing shallowest gradient. Meanwhile, the Lego piece with the fewest marked keypoints is the most sensitive. This relation holds for all intermediate objects with no outliers.\\
+
+We also notice that even the worst performing object, the Lego piece, has a gradient less than 1. The line appears to have a gradient of approximately $\frac{1}{2}$, when ~20cm of noise is added, the error magnitude is ~10cm. This is promising because it is unlikely that the true noise experienced would be as high as 20cm. The graph shows that all objects were very stable up to 5cm of noise. This is a much more reasonable and still fairly generous estimate for how much noise the system will experience.\\
+
+This result is quite promising for us, since the sensitivity appears to decrease as we mark more keypoints. We also note that the number of keypoints in this test are very low, due to requiring a human to manually place them. We will see in \ref{sec:algos-test} that certain keypoint algorithms can identify on the order of thousands of keypoint matches. While this is dependent on the object used, it is promising as to the reliability of the system when automatic keypoint algorithms are used.
+
+\subsubsection{Rotation Error}
+\ref{fig:noise-coord-rotation} shows how the rotation error increases as the amount of noise increases. The rotation error is computed as the geodesic distance between the rotations. Formally we consider the true rotation matrix $\hat{R}$ and the computed rotation matrix $R$ as representing orientations within 3D space. We then compute $E$, the error rotation matrix which rotates from $R$ to $\hat{R}$. $E$ represents how much more rotation we needed to do to get to the correct total rotation. $E$ represents a rotation by some angle $\theta$ about some axis. We consider $\theta$ to represent the size of this error, and is therefore our dependent variable. 
+$$E = R^T \cdot \hat{R}, \longspace \theta = \frac{trace(E) - 1}{2}$$
+
+Unfortunately, \ref{fig:noise-coord-rotation} clearly shows that the algorithm is much more sensitive to noise when computing the rotation matrix. The trend lines no longer appear to be linear for all objects. Now the error appears to increase more rapidly, before slowing down and reaching a plateau. The mug object appears to be most stable however, even this can reach quite large errors.\\
+
+We again notice that the lines do not cross the origin due to systematic error. However, this time there is an outlier. The ball object has a rotation error of ~60 degrees with the human marked keypoints. This is not a small error due to inaccuracies in the keypoint placement, this is a fundamental issue with the Ball object. As shown in \refapx{apx:test-suite}, the keypoint placements on this object are not well placed to determine rotation. 6 of the 7 keypoints are placed around the perimeter of the ball. These mark the silhouette of the ball, which since it is a perfect sphere, would not change with a pure rotation. These keypoints are very useful for determining translational offset, but they are no help in computing the rotation. This leaves a single keypoint placed in the middle of the object. The position of this keypoint, particularly its depth, is the only information the system has for computing how the object has rotated. Obviously this is insufficient, and leads to the very large error in \reffig{fig:noise-coord-rotation}. However, we will see in \refsec{sec:algos-test}, that even with many more keypoints, the system struggles to determine the rotation of the Ball object for the exact same reason. The majority of detected keypoints are on the edges of objects since this is when the image drastically transitions from the object to the background.\\
+
+It is to be expected that rotation would be more sensitive to the noise than translation. Consider \reffig{fig:noise-difference} which shows a simplified view of this concept. We can see that for translation, the most unlucky we can get with the noise is for all of the noise vectors to align. If the noise vectors all had length n, then this would produce a translation error of n. This is why in \reffig{fig:noise-coord-translation}, the gradient of the trend lines were all less than 1. The absolute worst case is that the translation error would be equal to the noise magnitude. Since this is very unlikely and we compute an average, the trend lines are much more shallow than this worst case. However, for rotation, the worst case is that the noise vectors are all rotated copies of each other. We can clearly see by inspecting the figure, that this rotates the object by a much more noticeable amount, even when the same magnitude of noise is applied. This is why the rotation error is much more sensitive to the noise than the translation error.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{figures/noise-difference.png}
+    \caption{Unlucky noise can affect rotation more than translation}
+    \label{fig:noise-difference}
+\end{figure}
+
+\subsection{Keypoint noise}
+In the second set of tests we change how we apply the random noise to better emulate our system. Since the pixel to world coordinate calculations use the exact view matrix of the camera, the only errors in this part of the system are the result of very small floating point inaccuracies. The source of the error will be predominantly a result of the keypoint matching. As such in this second round of tests, we add noise to the pixel coordinates of the keypoints, before converting them to world coordinates. This is more representative of the type of error we will encounter in this system, and so proves a more reliable result. Since the keypoint algorithms used offer sub-pixel precision, we are not limited to only adding integer amounts of pixel noise. As such we use the same random vector method as in the first tests, only this time the vector is 2 dimensional. Since it does not make sense to be adding too small of a fraction of a pixel, as this will have very little effect between runs, we run these tests with a larger granularity of noise magnitude. This does however, allow us to compute the average over 1000 runs, rather than 100, providing more reliable data.\\
+
+\begin{figure}[h]
+    \centering
+    \begin{subfigure}[t]{0.49\textwidth}
+        \includegraphics[width=\textwidth]{figures/fig_pixel_noise-translation.png}
+        \caption{Noise graph for translation error}
+        \label{fig:noise-pixel-translation}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.49\textwidth}
+        \includegraphics[width=\textwidth]{figures/fig_pixel_noise-rotation.png}
+        \caption{Noise graph for rotation error}
+        \label{fig:noise-pixel-rotation}
+    \end{subfigure}
+    \caption{Sensitivity analysis with added keypoint pixel noise}
+    \label{fig:noise-pixel}
+\end{figure}
+
+Unfortunately, in these tests the relationship seems to no longer be linear for some of the objects. Objects like the Jenga block and Ball are remarkably stable, with the noise having almost no impact on the computed translation. The Jenga block exhibits many properties of an ideally marked object for this algorithm. The object has many marked keypoints as discussed earlier. However, it is also one of the largest objects. This means that the noise is proportionally smaller when applied to this object as the smaller objects like the Lego.
 % table of results
 
 \section{Comparison of keypoint algorithms}
+\label{sec:algos-test}
 %evaluate SIFT vs ORB vs SIFT with GMS vs ORB with GMS vs our new one if we have time to make it
-We discussed in \refsubsec{subsec:keypoint-algos} that there are multiple different algorithms we could use for our system. Any algorithm which can extract and match keypoints can be used. In this section we analyse a few different aproaches 
+In this section we wish to empirically evaluate which keypoint extraction and matching algorithm performs best when used for our system. Any algorithm which can extract and match keypoints could theoretically be used for our system, however this paper focuses analysis on the algorithms discussed in \refsec{sec:keypoint-algos}.\\
+
+We consider two algorithms for keypoint extraction and description, SIFT and ORB. For these rows in the table we apply brute force matching with a suitable distance metric, performing no additional refinement. We add further rows to the table for additional refinement algorithms applied to the initial brute force matches. Despite our outlier filtering originally being designed to be performed after GMS matching, it is possible to apply it immediately to the brute force matches. However, where GMS refines the matches to conform to local smoothness constraints, our method simply removes outliers. Without GMS applied, it is likely that a large number of keypoints will be considered outliers. As such we do not expect this algorithm to perform well, nonetheless it is included to test this hypothesis. The table contains two additional rows, one for applying GMS to the brute force matches, and another for GMS with added outlier filtering.\\
+
+%TODO if we managed more runs then update the number
+To conduct the tests we use the same 5 object test suite as with the noise sensitivity tests. For each object we define 5 poses with varying difficulty for the system. We then run the system, using the specified keypoint algorithm to attempt to complete the task on the object in the new pose. Since the whole system is deterministic with respect to the object pose, we do not complete multiple runs with the same object in the same pose. In the table we report the mean translation error, denoted d; the mean rotation error, denoted $\theta$; the mean number of keypoint matches, denoted n; and the success rate of completing the task, denoted s. All averaged across the 5 poses. The results of these tests are presented in \reftab{tab:algo-results}.\\
+
+%TODO populate table
+\begin{table}[h!t]
+    \begin{adjustbox}{center}
+    \setlength{\tabcolsep}{10pt}
+    \renewcommand{\arraystretch}{1.05}
+    \begin{tabular}{| >{\columncolor{lightgray!25}}c | c | c | c | c | c |}
+        \hline
+        \rowcolor{lightgray!25}
+                    & Lego       & Mug        & Ball       & Jenga      & Domino     \\
+        \hline
+                    & d=0.0066   & d=0.0336   & d=0.0217   & d=0.0143   & d=0.0660   \\
+        SIFT        & \er{137.2} & \er{18.6}  & \er{53.3}  & \er{142.2} & \er{137.1} \\
+                    & n=         & n=         & n=         & n=         & n=         \\
+                    & s=\%       & s=\%       & s=\%       & s=\%       & s=\%       \\
+        \hline
+                    & d=         & d=         & d=         & d=         & d=         \\
+        SIFT        & \er{}      & \er{}      & \er{}      & \er{}      & \er{}      \\
+        + filtering & n=         & n=         & n=         & n=         & n=         \\
+                    & s=\%       & s=\%       & s=\%       & s=\%       & s=\%       \\
+        \hline
+                    & d=         & d=         & d=         & d=         & d=         \\
+        SIFT + GMS  & \er{}      & \er{}      & \er{}      & \er{}      & \er{}      \\
+                    & n=         & n=         & n=         & n=         & n=         \\
+                    & s=\%       & s=\%       & s=\%       & s=\%       & s=\%       \\
+        \hline
+                    & d=         & d=         & d=         & d=         & d=         \\
+        SIFT + GMS  & \er{}      & \er{}      & \er{}      & \er{}      & \er{}      \\
+        + filtering & n=         & n=         & n=         & n=         & n=         \\
+                    & s=\%       & s=\%       & s=\%       & s=\%       & s=\%       \\    
+        \hline
+                    & d=         & d=         & d=         & d=         & d=         \\
+        ORB         & \er{}      & \er{}      & \er{}      & \er{}      & \er{}      \\
+                    & n=         & n=         & n=         & n=         & n=         \\
+                    & s=\%       & s=\%       & s=\%       & s=\%       & s=\%       \\
+        \hline
+                    & d=         & d=         & d=         & d=         & d=         \\
+        ORB         & \er{}      & \er{}      & \er{}      & \er{}      & \er{}      \\
+        + filtering & n=         & n=         & n=         & n=         & n=         \\
+                    & s=\%       & s=\%       & s=\%       & s=\%       & s=\%       \\
+        \hline
+                    & d=         & d=         & d=         & d=         & d=         \\
+        ORB + GMS   & \er{}      & \er{}      & \er{}      & \er{}      & \er{}      \\
+                    & n=         & n=         & n=         & n=         & n=         \\
+                    & s=\%       & s=\%       & s=\%       & s=\%       & s=\%       \\
+        \hline
+                    & d=         & d=         & d=         & d=         & d=         \\
+        ORB + GMS   & \er{}      & \er{}      & \er{}      & \er{}      & \er{}      \\
+        + filtering & n=         & n=         & n=         & n=         & n=         \\
+                    & s=\%       & s=\%       & s=\%       & s=\%       & s=\%       \\
+        \hline
+    \end{tabular}
+    \end{adjustbox}
+    \caption{Summary statistics for each algorithm}
+    \label{tab:algo-results}  
+\end{table}
+
+From these results a number of observations are immediately clear. Most obviously, SIFT keypoints perform much worse than ORB features, across all objects, whichever matching algorithm we use. The key insight is to notice that the average number of matched keypoints is significantly lower than the same setup using ORB. We noticed in \refsec{sec:noise-test}, that the algorithm was more stable when a larger amount of keypoint matches were present. 
+
+
+
+
+...
+
+%TODO put in actul value !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Having selected our algorithm, we test a further 5 object poses and average across all objects to calculate the mean success rate of our framework as \textbf{65.4\%}. Since the end effector error and number of matched keypoints depend heavily on the object in question, it would not be appropriate to compute an average for these values. As stated in \refchap{chap:introduction}, we were not able to implement pre-existing One-shot Imitation Learning frameworks, due to their high computational requirements. As a result, we cannot directly compare these algorithms to our own on a consistent test suite. In lieu of this, we compare our results to those produced in the algorithm's original paper.\\
+
+As DINObot influenced many design choices in this framework, it would be pertinent to compare it to our solution. At a high level, the pipeline of our framework and DINObot share many similarities. As such it serves as an excellent base line for our system. The goal of this project was to show that we can take a standard One-shot Imitation Learning system, and exchange the computationally costly AI components with more space efficient classical algorithms, without experiencing a significant loss in performance. In their paper, N. Di Palo and E. Johns claim a task success rate of 
+%TODO does claim sound passive agressive. Im not accusing them of lying
+
 
 %OLD STUFF
 %We will evaluate the success of this project by analysing the proportion of tasks the agent is able to successfully complete. We will compare these results to similar approaches in the field \cite{one-shot-imitation, one-shot-pose-estimate}.

@@ -78,7 +78,7 @@ However it is worth considering that in this case an end effector pose does not 
     \label{fig:underdetermined}
 \end{figure}
 
-While this initially seems like a big problem, for our purposes we truly do only care that the end effector is in the position and orientation we specify. Any of the satisfying robot poses will do. Working with the end effector pose directly also simplifies a lot of our work later on. We will see in \refsubsec{subsec:alignment} that a lot of our calculations will involve the end effector pose. While we could compute this using forward kinematics if the demonstration instead stored joint angles, this would be an unnecessary extra step for no real benefit to the accuracy of the system. A way to use the underdetermined nature of the system to our advantage is explored further in \refappendix{apx:null-space}.\\
+While this initially seems like a big problem, for our purposes we truly do only care that the end effector is in the position and orientation we specify. Any of the satisfying robot poses will do. Working with the end effector pose directly also simplifies a lot of our work later on. We will see in \refsec{sec:alignment} that a lot of our calculations will involve the end effector pose. While we could compute this using forward kinematics if the demonstration instead stored joint angles, this would be an unnecessary extra step for no real benefit to the accuracy of the system. A way to use the underdetermined nature of the system to our advantage is explored further in \refapx{apx:null-space}.\\
 
 We may optionally decide to also include velocity information in addition to positional information. This would allow us to specify that the robot should have an exact position, but also describe how it should move in the next time step. While this may be useful for very specific tasks like throwing an object to hit an exact target; for the majority of tasks, velocity information is simply not necessary when we have the position for the next key frame already defined. If we were to save a key frame every time step, then the velocity information would be completely redundant, with velocity being directly computable as the displacement between the two key frames divided by the time step. In practice, for usability, we opt to not do this and only record key frames when deemed necessary by the user during the demonstration. While this does mean velocity information is not directly knowable, we decide that velocity information is not necessary for the simple tasks we are experimenting with in this paper.\\
 
@@ -125,13 +125,13 @@ This closed-system property is crucial even in the partially observable case. Wh
 
 For this project, we utilise methods presented by N. Di Palo and E. Johns in their implementation of \socalled{Dinobot} \cite{one-shot-imitation} to form the basis of our environment context. In their paper they use an RGB-D image taken prior to the trajectory being given. This satisfies the requirement of an observation made at time $t=0$. From this image, we are able to infer the position of objects within the image. Dinobot uses a first person, wrist mounted camera to capture the RGB-D image. This is in contrast to other papers which use a fixed third person camera \cite{one-shot-pose-estimate}.
 It is important that the object of interest which we will be interacting with is within the image, as the end effector will need to align relative to this object. If the object is not visible within the picture, then the robot will align relative to a different object it can see. Unless this object and the correct object are in the exact same position relative to each other, then this would cause the task to fail. 
-While a third person camera capturing the entire environment would guarantee the object of interest is visible, using a wrist mounted camera leads to lots of nice properties discussed in \refsubsec{subsec:alignment}. In their paper, N. Di Palo and E. Johns combat this problem by placing the robot in a known initial pose with the end effector and attached camera placed high pointing down onto the scene. This captures a wide view which should encompass any relevant objects.\\
+While a third person camera capturing the entire environment would guarantee the object of interest is visible, using a wrist mounted camera leads to lots of nice properties discussed in \refsec{sec:alignment}. In their paper, N. Di Palo and E. Johns combat this problem by placing the robot in a known initial pose with the end effector and attached camera placed high pointing down onto the scene. This captures a wide view which should encompass any relevant objects.\\
 
-This however enforces a restriction that the demonstration must always be given from the same initial starting position. This may not be an issue if the initial position is chosen well, but it is possible to create an environment where important information is occluded when viewed in this initial position. Consider \reffig{fig:occluded}. The task is to pick up the block from underneath the bridge. However, from the initial position in red, the robot is unable to see the object of interest, making it impossible to align correctly.
+This however enforces a restriction that the demonstration must always be given from the same initial starting position. This may not be an issue if the initial position is chosen well, but it is possible to create an environment where important information is occluded when viewed in this initial position. Consider \reffig{fig:occluded}. The task is to pick up the block from underneath the bridge. However, from the initial position in red, the robot is unable to see the object of interest, making it impossible to align correctly. The green line shows an alternative initial position where the object is no longer occluded.
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.9\textwidth]{example-image-a.png}
+    \includegraphics[width=0.9\textwidth]{figures/occluded-no-bg.jpg}
     \caption{Example environment where initial position cannot view the object of interest}
     \label{fig:occluded}
 \end{figure}
@@ -139,7 +139,7 @@ This however enforces a restriction that the demonstration must always be given 
 Whatever initial pose we choose for the robot, we could construct an example where the object of interest is not visible. The solution to this is to not fix the initial pose, but allow it to be dynamically chosen by the human giving the demonstration. All we need to do is include the initial pose in the environment context, along with the image it captures. Now rather than the initial pose being fixed in the code, we can use the initial pose defined in the demonstration instead.
 $$\Sigma = [I^{(RGB-D)}, s^{(r)}_{t=0}]$$
 
-In practice we make a few modifications to simplify the implementation. As will be seen in \refsubsec{subsec:alignment}, the purpose of knowing the initial pose is to know the extrinsics of the camera which took the image. If we know the position and orientation of the camera, we can compute world coordinates from the pixel coordinates of objects in the image. As such we decide to store the extrinsics directly, instead of computing them from the initial pose. As mentioned in \refsubsec{subsec:pybullet-specifics}, in Pybullet the extrinsics of the camera are captured by the view matrix, which we denote $V$.\\
+In practice we make a few modifications to simplify the implementation. As will be seen in \refsec{sec:alignment}, the purpose of knowing the initial pose is to know the extrinsics of the camera which took the image. If we know the position and orientation of the camera, we can compute world coordinates from the pixel coordinates of objects in the image. As such we decide to store the extrinsics directly, instead of computing them from the initial pose. As mentioned in \refsubsec{subsec:pybullet-specifics}, in Pybullet the extrinsics of the camera are captured by the view matrix, which we denote $V$.\\
 
 The other implementation difference is to store the depth information separately to the RGB data. This is because the RGB pixels are integers between 0 and 255, while the depth information is stored in \socalled{Normalised Device Coordinates} \cite{ndc}. These are float values in the range 0 to 1 where 0 represents an object on the near clipping plane and 1 represents an object on the far clipping plane. Mapping the depth information into integers of the range 0-255 and including as a 4th channel of the RGB image proved to cause too much loss in precision when recovering the true values, leading to very poor performance.\\
 
@@ -153,26 +153,33 @@ Where $W$ and $H$ are the width and height of the image captured. These values a
 
 
 %TODO im not sold on the section title
-\section{Implementation}
+\section{Implementation Overview}
 \label{sec:implementation}
 
-\subsection{Demonstration Selection}
+\reffig{fig:pipeline} shows an overview of the pipeline developed in this paper. The first step of the algorithm is to select the demonstration to follow. The robot will look at every demonstration image in its training corpus, and select the one which is most similar to the current environment. It will then compare this demonstration image to the live image taken by the robot's camera. From these two images the system then extracts keypoints, and uses these to compute the transformation which has been applied to the object. This offset is then applied to the end effector, transforming the demonstration trajectory into this new environment. The robot can then execute this transformed trajectory, completing the task. The following sections detail the specifics of each module of the pipeline.
 
-The first step of implementation comes before we can even consider the trajectory transfer function. We first need to consider its inputs. $f$ takes as parameter the task trajectory $\tau$, the original environment context $\Sigma$ and the context of the new test time environment $\Sigma'$. While $\Sigma'$ can be directly observed from the environment, $\tau$ and $\Sigma$ are dependent on the demonstration we choose to follow.\\
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\textwidth]{figures/pipeline.png}
+    \caption{Overview of system pipeline}
+    \label{fig:pipeline}
+\end{figure}
+
+\section{Demonstration Selection}
+\label{sec:demo-selection}
+The first step of implementation comes before we can even consider the trajectory transfer function. We first need to consider its inputs. $f$ takes as parameter the task trajectory $\tau$, the original environment context $\Sigma$ and the context of the new test time environment $\Sigma'$. While $\Sigma'$ can be directly observed from the test time environment, $\tau$ and $\Sigma$ are dependent on the demonstration we choose to follow.\\
 
 We want the system to be able to learn multiple tasks independent of each other and apply the correct task to a given scene. We do not want the human to have to tell the robot what it should do with the objects. The robot should be able to infer the task from the objects alone. More specifically, from the environment observation $\Sigma'$.
-The robot will have access to a pre-trained corpus of demonstrations. The \socalled{One-shot} nature refers to each task only requiring a single demonstration. However, to teach multiple tasks, a new demonstration for each task is still required. Each of these demonstrations has associated with it, the environment context $\Sigma$. Deciding which task to complete in the new environment is a matter of comparing the context image of each demonstration, to the live image the robot takes upon being presented with the environment. For this purpose, only the RGB image is used, the depth information and view matrix are ignored for now.\\
+The robot will have access to a pre-trained corpus of demonstrations. The \socalled{One-shot} nature of this system refers to each task only requiring a single demonstration to be learned. However, to teach multiple tasks, a new demonstration for each task is still required. Each of these demonstrations has associated with it, the environment context $\Sigma$. Deciding which task to complete in the new environment is a matter of comparing the context image of each demonstration, to the live image the robot takes upon being presented with the environment. For this purpose, only the RGB image is used, the depth information and view matrix are ignored for now.\\
 
-In order to compare the images, N. Di Palo and E. Johns opt to embed both images using a vision transformer created by Meta (formerly known as Facebook) called \socalled{Dino} \cite{dino-paper}. The transformer produces a 768-vector, and we can compare the embedding vector of different images using cosine similarity. Whichever embedding has highest similarity to the live embedding, corresponds to the context image being most similar to the live image. This in essence means the environment was most similar in this demonstration, to the current environment. As such we select this demonstration to perform. However, unless the cosine similarity happened to be exactly 1, then the two images do not match perfectly. The hope is that the transformer extracts information regarding the relevant parts of the image. This being the general make-up of objects within the image and the rough shape of objects. It should hopefully ignore the positional information of where objects are within the image and just concerns with the types of objects within the image. With this we can select the demonstration which concerns objects most closely related to the objects in the current scene, and worry about their position afterwards.\\
-%TODO maybe pull the commented out stuff about generalising to similar objects into this subsection
-TODO talk about generalise to novel objects\\
-TODO discuss that transformer does not use too much memory. Still fits our goal of lightweight, it was the specific parts of DinoBot that was too much\\
-Future work, could try HOG descriptor
+In order to compare the images, N. Di Palo and E. Johns opt to embed both images using a vision transformer created by Meta (formerly known as Facebook) called \socalled{Dino} \cite{dino-paper}. The transformer produces a 768-vector, and we can directly compare the embedding vector of different images using cosine similarity. Whichever embedding has highest similarity to the live embedding, corresponds to the context image being most similar to the live image. The hope is that the transformer extracts useful information regarding the relevant parts of the image, such as the general make-up of objects within the scene, while ignoring less important information like the positional information of objects.\\
+
+We can expect the similarity between the embeddings to be greatest when the corresponding images contain the same objects. However, this system naturally extends to generalising to unseen objects as well. If no such demonstration exists on the specific object in the live scene, then we can still select whichever demonstration is closest. Since we directly compare not the images themselves, but the image embeddings from the vision transformer, this translates to selecting the image with the object which the transformer sees as the most similar. For example the robot had a demonstration to pick up a can, it is likely that when faced with a bottle in the current scene that the system would select the demonstration of the can. This is because the objects appear similar as they are both cylindrical items, and the robot would have to interact with them in similar ways, by grasping around the cylinder. As such we can conclude that the demonstration of the can is the closest one to working with this new object. The hope would be that these two objects are similar enough that the same demonstration would be able to successfully complete the task on this new object.
 
 
-\subsection{Trajectory Transfer}
-\label{subsec:alignment}
-Now that we have the necessary parameters, we can begin implementing the trajectory transfer function, $f(\tau, \Sigma, \Sigma')$. In the previous subsection we found a demonstration which shows us how to manipulate the object in the scene. Now we need to consider the pose of the object to transform the trajectory. During the demonstration, the object was at some position with some orientation in world space $\{X_{demo}, \Theta_{demo}\}$. When the object is at this exact position and orientation, we know how to complete the task by executing the demonstration trajectory, $\tau$. In effect we know that for the specific case where the environment has not changed:
+\section{Trajectory Transfer}
+\label{sec:alignment}
+Now that we have the necessary parameters, we can begin implementing the trajectory transfer function, $f(\tau, \Sigma, \Sigma')$. In the previous subsection we found a demonstration which shows us how to manipulate the object in the scene (or a similar one). Now we need to consider the pose of the object to transform the trajectory. During the demonstration, the object was at some position with some orientation in world space $\{X_{demo}, \Theta_{demo}\}$. When the object is at this exact position and orientation, we know how to complete the task by executing the demonstration trajectory, $\tau$. In effect we know that for the specific case where the environment has not changed:
 $$f(\tau, \Sigma, \Sigma) = \tau$$
 
 However, generally in the live scene the object may have moved to some different position and orientation $\{X_{live}, \Theta_{live}\}$. We define the offset between the two poses as the translation and rotation which maps the demonstration pose onto the live pose. Formally \footnote{For an explanation of the formula for R, refer to \refsec{sec:rotations}}:
@@ -198,14 +205,14 @@ This is why using a wrist mounted camera is useful. Since the camera is attached
 $$X_{live}^{(eef_{live})} = X_{demo}^{(eef_{demo})} \implies X_{live}^{(image_{live})} = X_{demo}^{(image_{demo})}$$
 %TODO: this one isnt iff since the object could move away and be smaller but in the same position. This is because X^(img) is only 2D unlike the real world coordinates. Write a short paragraph explaining this. Maybe if we pretend the image is RGB-D and not stored seperatly, then it becomes iff, think about it.
 
-If this is the case then the image captured in the demonstration and live scene will be exactly the same (barring any background noise such as extra objects). This makes it easy to detect when the end effector is aligned since we just move until the end effector until the live and demonstration image match within a suitably low tolerance. The downside to this method will be more clear after discussing \refsubsec{subsec:kabsch}. While we can still compute the difference between the position and orientation of the object in image space, this results in a translation in a unit of pixels rather than meters which is used by the simulation. This means that while it is easy to know when the end effector has aligned, it is difficult to know by how much we should move to align. This method also makes it much more cumbersome to include depth information, since the depth data is not computed in a unit of pixels, but rather holds the actual depth from the camera to the object in normalised device coordinates. As a result, the x and y coordinates of the object have a different unit to the z coordinate. While these are all issues which are theoretically solvable, it is much easier and debatably more elegant to perform all the calculations in a single reference frame, by estimating the pose of the object in world space. As such this will be the method used going forward.
+If this is the case then the image captured in the demonstration and live scene will be exactly the same (barring any background noise such as extra objects). This makes it easy to detect when the end effector is aligned since we just move until the end effector until the live and demonstration image match within a suitably low tolerance. The downside to this method will be more clear after discussing \refsec{sec:kabsch}. While we can still compute the difference between the position and orientation of the object in image space, this results in a translation in a unit of pixels rather than meters which is used by the simulation. This means that while it is easy to know when the end effector has aligned, it is difficult to know by how much we should move to align. This method also makes it much more cumbersome to include depth information, since the depth data is not computed in a unit of pixels, but rather holds the actual depth from the camera to the object in normalised device coordinates. As a result, the x and y coordinates of the object have a different unit to the z coordinate. While these are all issues which are theoretically solvable, it is much easier and debatably more elegant to perform all the calculations in a single reference frame, by estimating the pose of the object in world space. As such this will be the method used going forward.
 
 
-\subsection{Using key points to approximate position}
-\label{subsec:keypoints}
+\section{Using keypoints to approximate position}
+\label{sec:keypoints}
 As previously mentioned, our goal is to align the live and demonstration image so the object looks the same relative to the end effector camera. It is difficult to work with the image directly, since working with the colours of pixels leaves the system sensitive to lighting conditions and noise in the image. Instead we would like to use the image to estimate the position and orientation of the object in world space, and use this for our calculations instead. One approach could be to identify the bounds of the object using computer vision techniques, to work out exactly which pixels represent the object. This is relatively simple since the object is almost certainly a different colour to the background. By knowing which pixels belong to the object we can estimate the centre of the object and use this as the position of the object in image space.\\
 
-\textit{For all figures in this section we will assume the left image is the live image and the right image is the demonstration image.}\\
+\textit{For all figures in this chapter we will assume the left image is the live image and the right image is the demonstration image.}\\
 
 \reffig{fig:centre-of-mass} shows how the centre of mass in the live image is further left than it was in the demonstration image. Therefore the object is too far to the left compared to the demonstration. To fix this we would want to move the end effector camera to the left, so the centre of mass in the live image would move to the right, aligning with the demonstration image.
 
@@ -240,23 +247,144 @@ We can also see that in both figures, the live image contains two additional key
 
 These figures are designed to give an intuition for how we can use keypoints to find the desired end effector offset. In these figures we have considered ideal keypoints where the keypoints are extracted on useful points of the image, namely the object corners, and where the matching is perfect with no mistakes. These keypoints have been placed by a human for the purposes of demonstration. Obviously for the complete system we want the keypoint extraction and matching to be automated. How we achieve this will be explored next.
 
-\textcolor{red}{here onwards is WIP}
 
-%TODO undecided whether this or kabsch section should come first
-\subsection{Automated keypoint extraction and matching}
-\label{subsec:keypoint-algos}
-Keypoint extraction is a popular and well studied problem in the field of computer vision. As such we have many options at our disposal. Our goal is to identify the pixels where the image changes significantly. These may be where ...TODO
-%TODO mention experiments in evaluation section which tells us the best algorithm for extraction and matching
+\section{Automated keypoint algorithms}
+\label{sec:keypoint-algos}
+Keypoint extraction involves identifying distinctive points or features in an image that can be reliably recognized under different viewing conditions, such as taking the same image from a different angle, zoom, or changing the lighting conditions. These keypoints, often represent corners or edges of objects within the image, since these are easy to recognize across different images.
+Once we have chosen the keypoints we need some way to identify them. This is achieved through creating feature descriptors, which provide a unique signature for each keypoint based on the image information in the local area around the keypoint. These feature descriptors should be invariant to the viewing conditions described above, so that the same keypoint is assigned the same (or as close as possible within some error) descriptor, even when viewed from different angles, zoom, or lighting conditions.
+Once keypoints are extracted from different images, keypoint matching techniques allow us to find correspondences between the keypoints in two different images of the same scene. This section explores various keypoint extraction algorithms, how they work, and resulting advantages and disadvantages for our use case. As well as this we discuss the methods used to match these keypoints across images.\\
 
-\subsection{Calculating end effector offset}
-\label{subsec:kabsch}
-Now that we have a list of matched keypoint pairs, we can begin to calculate the offset between the object in the live and demonstration image. Fortunately there exists an algorithm for computing the translation, rotation and scaling, which best maps a set of points onto another set of points. This algorithm is called the \socalled{Kabsch-Umeyama algorithm} \cite{kabsch}. The algorithm takes in two sets of points, a reference set P, and a test set Q. It computes a translation t, a rotation matrix R and a scale factor s, such that when these transformations are applied to Q, yielding Q', the root mean squared distance between P and Q' is minimized. For our purposes we make a number of important modifications to the original algorithm to better fit our use case.
+\subsection{Keypoint Extraction}
+Most keypoint detection algorithms work by identifying points in the image where it sharply changes. These are often the boundaries between an object and the background. Mathematically, these are the points in the image where the derivative peaks (either positively or negatively). The derivative is approximated by the finite difference between pixel intensities, and computed in both the X and Y direction of the image. We can therefore compute the magnitude and direction of the gradient:
+$$|g| = \sqrt{g^2_x + g^2_y}, \longspace \theta = \arctan{\frac{g_y}{g_x}}$$
+where $g_x$ and $g_y$ represent the finite difference (gradient) in the X and Y direction respectively. 
 
-As mentioned above, we decide to convert all keypoints to world coordinates first. By doing this we can more easily include the depth information of the image. Additionally, this will result in the translation computed already being in world coordinate units, meaning no further calculation is needed to calculate how far to move the end effector.\\
+\subsubsection{SIFT}
+The first keypoint detection algorithm we look at is Scale-invariant Feature Transform (SIFT), designed by David Lowe and published in 2004 \cite{SIFT}.\\
+
+The extraction process begins with identifying potential keypoints through scale-space extrema detection. This involves creating a series of progressively blurred images using Gaussian filters at different scales and computing the \socalled{difference of Gaussians} (DoG) to highlight areas of interest. Local extrema in these images are points which stand out from their neighbours in both space and size. The keypoints are further localized to sub-pixel accuracy.
+%TODO maybe say how DOG aproximates laplacian
+
+Once keypoints are identified we must assign a descriptor. To ensure the descriptors are invariant to image rotation, all local pixels vote for a dominant orientation in a discretised histogram using their gradient orientation. The winning bucket is the dominant orientation. This dominant orientation is used to offset all future orientation calculations. The local area is now split into a 4x4 grid of sub-regions. Each sub-region produces a histogram of gradient orientations, relative to the dominant orientation, with votes weighted by the gradient magnitude. Each histogram is encoded as the height of each bucket in a vector. All histogram vectors are concatenated creating a final 128-vector descriptor.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\textwidth]{figures/SIFT.png}
+    \caption{SIFT keypoint descriptor \cite{SIFT}}
+    \label{fig:SIFT}
+\end{figure}
+
+SIFT was a seminal algorithm in computer vision which has been tried and tested since its patent expired. It stands as an excellent baseline for our keypoint extraction.
+
+
+\subsubsection{ORB}
+ORB (Oriented FAST and Rotated BRIEF) is a keypoint extraction and description algorithm developed by Ethan Rublee et al. in 2011 \cite{ORB}. ORB combines the FAST (Features from Accelerated Segment Test) keypoint detector \cite{FAST} with the BRIEF (Binary Robust Independent Elementary Features) keypoint descriptor \cite{BRIEF}.\\
+
+FAST identifies keypoints by examining the intensity of pixels in a circular region around each candidate pixel and classifying it as a keypoint if it has a sufficient number of neighbouring pixels that are significantly brighter or darker than the candidate. ORB utilises FAST at different scales to create scale invariant features.\\
+
+Additionally, ORB assigns an orientation to each keypoint as the direction of the vector from the keypoint to the centroid of the intensities within a local patch. This orientation assignment ensures that the keypoints are invariant to image rotation.
+BRIEF is then used to assign a descriptor to each keypoint. BRIEF generates a binary string for each keypoint by performing a series of binary intensity difference tests between pairs of pixels at predefined locations relative to the keypoint. \reffig{fig:ORB} shows an example of which pixel intensities may be compared to each other. This results in a 256 bit binary string, as opposed to a 128-vector of floating point values with SIFT.\\
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.7\textwidth]{figures/ORB.png}
+    \caption{Example ORB pixel comparison locations \cite{BRIEF}}
+    \label{fig:ORB}
+\end{figure}
+
+ORB's main advantage is its speed and efficiency. Large amounts of keypoints can be detected and described very quickly, since the majority of calculations are binary tests on pixel intensities.\\
+
+
+\subsection{Keypoint Matching}
+Once we have extracted keypoints and their descriptors, we need a way to find which keypoints represent the same semantic features across the two images. This is done by defining some notion of distance between keypoint descriptors. A shorter distance means the descriptors are more similar, and they are more likely to refer to the same feature of the image.\\
+
+\subsubsection{Brute Force Matching}
+The simplest method for keypoint matching is brute force matching. In this approach, each descriptor from one image is compared with all the descriptors from another image to find the best matches. This involves calculating the distance between each pair of descriptors using a suitable metric. For SIFT descriptors this would be the Euclidean distance between the vector descriptors. For ORB this would be the Hamming distance between the bit string descriptors. The descriptor pairs with the smallest distances are considered as potential matches.\\
+
+Brute force matching can be computationally expensive, especially for large datasets, as it requires a comparison of every possible pair of descriptors, resulting in $O(n^2)$ time complexity. The advantage is that this method is highly accurate and does not rely on any approximations, making it a reliable choice. To improve accuracy we can include additional considerations such as cross checking, where matches are verified by ensuring mutual nearest neighbors, and ratio tests, which filter out ambiguous matches by comparing the distance of the closest match to the second closest match.
+
+\subsubsection{Grid-based Motion Statistics}
+Grid-based Motion Statistics (GMS) is a more sophisticated algorithm developed by Jiawang Bian et al. in 2017 \cite{GMS}. This paper describes a method for refining keypoint matches leveraging a few key assumptions. If we assume that the two images are of the same object, then we can impose smoothness constraints. Unlike brute force matching, which relies solely on descriptor similarity, GMS incorporates spatial information to filter out false matches effectively.\\
+
+The key principle of GMS is to divide the image into a grid and analyze the distribution of keypoint matches within each grid cell, ensuring that matches are not only similar in descriptor space but also exhibit consistent motion patterns across the image. The object may have been moved, rotated, zoomed and warped by camera projection, but if it is the same object then there will be consistencies in how near by keypoints are transformed.\\
+
+This is perfect for our use case since provided the demonstration selection stage has worked as intended, the object will be the same in both images. Furthermore, the assumption GMS relies is one we have already taken. We have already assumed that the object in both images has simply been translated and rotated between the live and demonstration image. We already mentioned in \refsec{sec:keypoints} that we are using these keypoints to try to recover this transformation. As such, by using GMS we filter out keypoint matches which specifically contradict this assumption, leading to much more stable results when computing the transformations. This is demonstrated in \refchap{chap:evaluation}.
+
+\subsubsection{Consensus Filtering}
+While GMS is very good at computing consistent keypoint matches, it still can have some difficulty with large groups of inconsistent matches, since GMS only filters out matches which disagree with its local neighbours. This is great as a first pass and serves to remove the majority of high frequency noisy matches. However, the grid based structure of GMS, means that individual grid cells can often disagree with each other. This is low frequency noise, where collections of matches disagree with other collections.\\
+
+\begin{figure}[h]
+    \centering
+    \begin{subfigure}[t]{0.49\textwidth}
+        \includegraphics[width=\textwidth]{figures/outliers-gms.png}
+        \caption{Keypoint matches using GMS}
+        \label{fig:outliers-gms}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.49\textwidth}
+        \includegraphics[width=\textwidth]{figures/outliers-gms+ours.png}
+        \caption{Keypoint matches using GMS + consensus filtering}
+        \label{fig:outliers-gms+filter}
+    \end{subfigure}
+    \caption{Our method further improves the consistency of keypoints}
+    \label{fig:consensus-filtering}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figures/bad-matches.png}
+    \caption{Identifying outliers by their distance from the mean vector}
+    \label{fig:bad-matches}
+\end{figure}
+
+\reffig{fig:consensus-filtering} shows example keypoint matching using GMS, before and after applying consensus filtering. We can see that in \reffig{fig:outliers-gms}, there is a collection of keypoints which match incorrectly. The object has moved diagonally, as most matches correctly identify. However, this collection correspond to a more horizontal translation. Our filtering method successfully removes these incorrect matches, while retaining the correct matches.\\
+
+In this paper we develop an additional measure to improve our keypoint matches. We further eliminate outliers to refine keypoint matches by considering all matches, not just those within a grid cell. After applying GMS to obtain an initial set of matches, this algorithm performs an additional filtering step based on vector analysis of the keypoint coordinates. We start by considering keypoint matches as vectors within image space. If a keypoint at $(x,y)$ in image one, matches to a keypoint at $(x',y')$ in image two, then we consider the match as the vector from $(x,y)$ to $(x'y')$. This is the line you would get by connecting the keypoints if the two images were superimposed on top of each other. By considering keypoint matches as vectors in image space, we can consider these vectors as describing how the object moved between the images. This is not a direct calculation of the translation and rotation, since we make no assumption that the camera which took the images was in the same pose in world space. However, we are still able to perform some filtering on these vectors regardless.\\
+
+To identify and remove outliers, we examine the gradient and magnitude of each vector relative to the mean values. Matches that deviate significantly from the mean are considered potential outliers. Specifically, we order the matches based on how much they differ from the mean vector. We then compute the finite difference between consecutive ordered pairs of match vectors. This allows us to see how quickly the derivative changes. The algorithm looks for spikes in the derivative, which indicate sudden changes in the gradient or magnitude that are inconsistent with the overall motion pattern. If the spike is significant enough then we split the ordered list at this point. If the shorter set is significantly smaller than the larger set, then we determine that the shorter set are outliers, and we remove them. \reffig{fig:bad-matches} shows a plot of distance from the mean and the finite difference for the images shown in \reffig{fig:consensus-filtering}\\
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[t]{0.49\textwidth}
+        \includegraphics[width=\textwidth]{figures/inliers-gms.png}
+        \caption{Keypoint matches using GMS}
+        \label{fig:inliers-gms}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.49\textwidth}
+        \includegraphics[width=\textwidth]{figures/inliers-gms+ours.png}
+        \caption{Keypoint matches using GMS + consensus filtering}
+        \label{fig:inliers-gms+filter}
+    \end{subfigure}
+    \caption{Our method only removes outlier matches}
+    \label{fig:consensus-filtering2}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/good-matches.png}
+    \caption{A rotated object will have a smooth increase in distance}
+    \label{fig:good-matches}
+\end{figure}
+
+It is important to analyse the derivative and not just remove the vectors furthest from the mean. This is because if a rotation is present then the vectors will not agree perfectly on their orientation and magnitude. However, these changes should be smooth in the ordered list of matches, since a rotation would affect all vectors proportional to their distance from the centre of rotation. These matches are not outliers and should not be removed. As such, only when the finite difference changes drastically can we accuse the matches of being outliers. \reffig{fig:consensus-filtering2} shows an object which has been rotated. For this object the matches are very accurate and consistent. Consensus filtering removes very few matches as outliers. We can see in \reffig{fig:good-matches} that this corresponds to a smooth increase in the distance from the mean. As such the derivative is much more stable.\\
+
+In \refchap{chap:evaluation} we compare the effectiveness of each keypoint algorithm with each matching algorithm, to determine the best combination of algorithms for use in this project.\\
+
+%TODO these figures are being placed in the next section. Not ideal, try to fix
+
+
+
+\section{Calculating end effector offset}
+\label{sec:kabsch}
+Now that we have a list of matched keypoint pairs, we can begin to calculate the offset between the object in the live and demonstration image. Fortunately there exists an algorithm for computing the translation, rotation and scaling, which best maps a set of points onto another set of points. This algorithm is called the \socalled{Kabsch-Umeyama algorithm} \cite{kabsch}. The algorithm takes in two sets of points, a reference set $P$, and a test set $Q$. It computes a translation $t$, a rotation matrix $R$ and a scale factor $s$, such that when these transformations are applied to $Q$, yielding $Q'$, the root mean squared distance between $P$ and $Q'$ is minimized. For our purposes we make a number of important modifications to the original algorithm to better fit our use case.\\
+
+As mentioned above, we decide to convert all keypoints to world coordinates first. By doing this we can more easily include the depth information of the image. Additionally, this will result in the translation computed already being in world coordinate units, meaning no further calculations are needed to compute how far to move the end effector.\\
 
 \begin{algorithm}
     \setlength{\baselineskip}{18pt}
-    \caption{\textbf{Kabsch-Umeyama algorithm}}\label{alg:kabsch}
+    \caption{\textbf{Kabsch-Umeyama algorithm}}
+    \label{alg:kabsch}
     \begin{algorithmic}[1]
         \Require $P = [p_1, p_2, \dots p_N], \shortspace p_i \in \real^M$
         \Statex $Q = [q_1, q_2, \dots q_N], \shortspace q_i \in \real^M$
@@ -265,9 +393,9 @@ As mentioned above, we decide to convert all keypoints to world coordinates firs
             \State $\overline{p} \gets \frac{1}{N}\sum^N_{i} p_i$
             \State $\overline{q} \gets \frac{1}{N}\sum^N_{i} q_i$
             \State $\sigma^2_P \gets \frac{1}{N}\sum^N_{i} |p_i - \overline{p}|^2$
-            \State $M \gets \frac{1}{N}\sum^N_{i} (p_i - \overline{p})^T(q_i - \overline{q})$ \Comment{Covariance Matrix}
-            \State $U, E, V^T = \Call{SVD}{M}$ \Comment{Single Value Decomposition}
-            \State $c \gets \frac{\sigma^2_P}{trace(E)}$
+            \State $H \gets \frac{1}{N}\sum^N_{i} (p_i - \overline{p})^T(q_i - \overline{q})$ \Comment{Covariance Matrix}
+            \State $U, \Sigma, V^T \gets \Call{SVD}{H}$ \Comment{Singular Value Decomposition}
+            \State $c \gets \frac{\sigma^2_P}{trace(\Sigma)}$
             \State $R \gets U \cdot V^T$
             \State $t \gets \overline{p} - cR \cdot \overline{q} $
             \For{$i=1 \dots N$}
@@ -279,19 +407,42 @@ As mentioned above, we decide to convert all keypoints to world coordinates firs
     \end{algorithmic}
 \end{algorithm}
 
-...
-The first step of the algorithm will look familiar to something we tried in \refsubsec{subsec:keypoints}. The first step is to compute the centroids of the two sets of points. This is just the average position of all the points in the set. This acts like the centre of mass of the point set. With sufficiently many and well spaced keypoints in our set, this centre of mass will be approximately equal to the centre of mass we computed earlier by considering all pixels of the object. However, the Kabsch-Umeyama algorithm does not use compute the translation as ... %TODO continue\\
+\refalg{alg:kabsch} shows the standard Kabsch-Umeyama algorithm. The first step of the algorithm will look familiar to something we tried in \refsec{sec:keypoints}. The first step is to compute the centroids of the two sets of points. This is just the average position of all the points in the set. This acts like the centre of mass of the point set. With sufficiently many and well spaced keypoints in our set, this centre of mass will be approximately equal to the centre of mass we computed earlier by considering all pixels of the object. The algorithm then normalises the points so that the centre of mass is at the origin. From here it computes the covariance matrix, H, between the two sets of points. This covariance matrix tells us how the X, Y and Z coordinates vary between the two sets of points.\\
 
+Next we perform singular value decomposition (SVD) to break H into a composition of 3 elementary transformations.\\
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.65\textwidth]{figures/SVD.jpg}
+    \caption{Singular Value Decomposition}
+    \label{fig:svd}
+\end{figure}
+
+In \reffig{fig:svd} we can see that the effect of multiplying by the matrix M is to first rotate by the matrix $V^T$, followed by a scaling by the diagonal matrix $\Sigma$, followed by another rotation by the matrix $U$. We note that $\Sigma$ is diagonal, where each element defines how much to scale in each direction. In this figure, we scale by $\sigma_1$ in the X direction and $\sigma_2$ in the Y direction. Therefore
+$$\Sigma = \begin{bmatrix}
+  \sigma_1 & 0\\
+  0 & \sigma_2
+\end{bmatrix} $$
+
+This notion naturally extends to higher dimensions. Since $U$, $\Sigma$, $V^T$ all have the same shape as the input matrix M, when we pass in our $3 \times 3$ covariance matrix, we get the rotation, scaling and rotation in 3 dimensions. Note that $\Sigma$ is the conventional notation for this diagonal matrix, it is not the demonstration environment context which we also denoted with capital sigma.\\
+
+From here we compute the rotation between the points as $R = U \cdot V^T$. This is just the combination of the rotation parts of the covariance matrix H. 
+The scale factor is computed from the standard deviation of points within the reference set P, normalised by the amount of scaling caused by $\Sigma$ in the covariance matrix decomposition. The translation is then computed as the difference between the centroids after the rotation and scaling transformation is applied.\\
+
+%TODO maybe a better segway sentence
 We make a number of modifications to the algorithms which reflect specifics of our use case. The first major difference is in computing the rotation matrix. As can be seen in line 10 of \refalg{alg:modified-kabsch}, we include an additional matrix S in the construction of R. The purpose of this is to prevent reflections in our transformation. In the original Kabsch-Umeyama algorithm, any transformation to map Q onto P is allowed. This includes translation, rotation and scaling, but it also implicitly includes reflections. The reflection is not explicitly computed, rather it is hidden away inside the rotation matrix R. In the original algorithm it is possible for R to have a determinant of -1. If this is the case then the matrix actually represents a rotation and reflection combined. For our purposes we do not want to allow reflections since we cannot reflect the object by moving the end effector, we can only rotate around it. In order to prevent reflections we just need to negate the last row of $V^T$ (or the last column of U) before computing the dot product to find R. To avoid needing to recompute R if we notice it has a negative determinant, we can find the determinant before we compute R, using the fact that $det(A \cdot B) = det(A) \cdot det(B)$. If this determinant product equals $-1$ then the determinant of R will be $-1$ and so we need to negate the last row of V. This is achieved with the matrix S. This matrix will be set so that it is the identity matrix if the determinant of R is already going to be $1$, having no effect. But if the determinant of R is going to be $-1$, then we set the bottom right element of S to be $-1$, which in the dot product calculation will have the effect of negating the last row of V.\\
 
-Another noticeable difference between \refalg{alg:kabsch} and \refalg{alg:modified-kabsch} is that in our version we do not need to compute the scale factor c or the transformed points Q'. We do not compute Q' simply because we don't actually need these points, we just want the transformation from Q to P so that we can apply this transformation to the end effector. However, the reason we don't compute a scale factor is more subtle. It is the same reason we do not allow reflections in the rotation matrix, we cannot magically scale points by moving the end effector. The scale factor would allow us to scale all points in Q further from $\overline{q}$. However, this is not something we can do with the end effector. We can slightly scale points by moving the end effector closer to the object, %TODO finish
+Another noticeable difference between \refalg{alg:kabsch} and \refalg{alg:modified-kabsch} is that in our version we do not need to compute the scale factor c or the transformed points Q'. We do not compute Q' simply because we do not need these points, we just want the transformation so that we can apply it to the end effector. However, the reason we don't compute a scale factor is more subtle. It is the same reason we do not allow reflections in the rotation matrix, we cannot magically scale points by moving the end effector. The scale factor would allow us to scale all points in Q further from $\overline{q}$. However, this would correspond to physically making the object larger or smaller within the world. This is not something we can do by moving the end effector. Moving the end effector closer to or further from the object, will slightly scale how large it looks in the captured image due to perspective projection, however, this movement would also affect the depth from the camera to the object, impacting the Z coordinates of the keypoints in the image. As such we do not allow the robot to consider scaling the object as part of the transformation. If the end effector is too close to or too far from the object, then this is handled through the depth information mismatching, which would compute a movement in the Z axis to fix this.\\
+
+While this does limit the system's generalisability to novel objects which are different sizes compared to demonstration objects, it is a necessary sacrifice. Even with the same object in both images, the scale factor is rarely computed as exactly 1, due to camera perspective warping the object. This means the calculation of the scale factor is far too inaccurate to be used reliably. Adding it into the calculation for the translation causes this result to also become wildly inaccurate, decreasing the reliability of the whole system.
 \\
 
-The final modification we make is in how we compute the translation. ... %TODO finish
+The final modification we make is in how we compute the translation. In \refalg{alg:modified-kabsch} we compute the translation as the difference in the centroids, without the rotation and scaling applied. We already discussed why scaling is ignored. However, removing the rotation from this step is less obvious. This is a result of how our environment is set up. We decide to implement rotations about the current position. This is the case for all objects, but especially important for the end effector. When we rotate the end effector, we do not rotate about the world origin, we rotate about the end effector's current position, effectively spinning it in place. As such we can consider the translation and rotation as two independent transformations. First we spin the end effector in place to match the object's orientation. Then we move the end effector so that it is aligned relative to the object. Because the rotation happens in place, it does not have any effect on how much we need to translate by.
 
 \begin{algorithm}
     \setlength{\baselineskip}{18pt}
-    \caption{\textbf{Modified Kabsch-Umeyama algorithm}}\label{alg:modified-kabsch}
+    \caption{\textbf{Modified Kabsch-Umeyama algorithm}}
+    \label{alg:modified-kabsch}
     \begin{algorithmic}[1]
         \Require $P = [p_1, p_2, \dots p_N], \shortspace p_i \in \real^M$
         \Statex $Q = [q_1, q_2, \dots q_N], \shortspace q_i \in \real^M$
@@ -299,8 +450,8 @@ The final modification we make is in how we compute the translation. ... %TODO f
         \Procedure{Modified-Kabsch-Umeyama}{P, Q}
             \State $\overline{p} \gets \frac{1}{N}\sum^N_{i} p_i$
             \State $\overline{q} \gets \frac{1}{N}\sum^N_{i} q_i$
-            \State $M \gets \frac{1}{N}\sum^N_{i} (p_i - \overline{p})^T(q_i - \overline{q})$ \Comment{Covariance Matrix}
-            \State $U, E, V^T = \Call{SVD}{M}$ \Comment{Single Value Decomposition}
+            \State $H \gets \frac{1}{N}\sum^N_{i} (p_i - \overline{p})^T(q_i - \overline{q})$ \Comment{Covariance Matrix}
+            \State $U, \Sigma, V^T \gets \Call{SVD}{H}$ \Comment{Singular Value Decomposition}
             \State $S \gets I_{M \times M}$ \Comment{$M \times M$ Identity matrix}
             \If{$det(U) * det(V^T) == -1$}
                 \State $S_{M,M} \gets -1$ \Comment{Set the bottom right corner element to $-1$}                
@@ -316,20 +467,36 @@ The final modification we make is in how we compute the translation. ... %TODO f
 
 One final nuance with using this modified function is what order to pass the parameters in. We recall that the function computes the transformation which maps Q onto P. Therefore it would seem logical to pass the demonstration points as P and the live points as Q. This tells us how to move the live points so that they line up with the demonstration points. However, a subtlety is that we cannot directly move the live points by this transformation. We move the end effector and the camera in order to affect where the points will be in the next iteration. If we wish the points to move to the left of the image, then we need to move the camera to the right. Similarly to rotate the points clockwise about the Z axis, we rotate the camera anti-clockwise about the Z axis. This means after computing $t$ and $R$, we actually move the end effector by $-t$ and rotate it by $R^T$. It just so happens that $-t$ and $R^T$ are exactly the values returned from the function if you swap the inputs, computing the transformation from the demonstration points onto the live points. As such this is the order we choose to pass the parameters, to avoid needing additional calculations.
 
-
-%TODO mention experiments for how it behaves with noise applied to ideal matches.
+%TODO MAYBE mention experiments for how it behaves with noise applied to ideal matches.
 % create random unit vector, and random magnitude of noise. This way we can ensure noise is in a tight window. So we can say this is how it perfromed with 1-5 pixels noise, 5-10. Better than 1-5 and 1-10.
 
+\section{Final Algorithm}
+With each of these modules defined, we can consider the algorithm as a whole. Following the pipeline shown in \reffig{fig:pipeline} we produce the following pseudocode:
 
-%keypoint extraction - diagrams to show how we extract keypoints, what sort of parts are keypoints due to change in derivative.
-%  - SIFT vs BRIEF/ORB
-% 
-% Keypoint matching - the different distance metrics for SIFT and ORB.
-%  diagrams for how matching can help us identify translations and rotations, ideal matches
-% GMS (Do more research as to how it works) and how we refine matches into better matches for our purposes
-% calculating transformation from matches (not sure where this section should go. Could move higher up to motivate why we extract keypoints at all)
-% Go through the equations, cite Kabsch algorithm, explain why we compute translation without R since we consider rotation as spinning in place and so translation is just the offset in centroids.
-
+\begin{algorithm}
+    \setlength{\baselineskip}{18pt}
+    \caption{\textbf{Lightweight One-shot Imitation Learning algorithm}}
+    \label{alg:whole-system}
+    \begin{algorithmic}[1]
+        \Require $\mathcal{D} = \{[\tau, I^{(RGB)}, I^{(D)}, V]\}$ \Comment{set of training demonstrations}
+        \Statex $\Sigma' = [I'^{(RGB)}, I'^{(D)}, V']$ \Comment{live environment context}
+        \State Select demonstration
+        \Repeat
+            \State Extract keypoints from demonstration image and live image
+            \State Match keypoints between demonstration image and live image
+            \State Convert matching keypoints to world coordinates
+            \State Calculate $t$, $r$ from modified Kabsch-Umeyama algorithm
+            \State Move end effector by $t$ and rotate by $r$
+            \State Calculate mean keypoint error
+        \Until{keypoint error $>$ threshold}
+        \State Calculate total amount moved $M$ and $R$
+        \ForAll{keyframes $[P,O]$ in chosen demonstration}
+            \State Move end effector to $P+M$ and $RO$
+        \EndFor
+        
+    \end{algorithmic}
+\end{algorithm}
+%TODO make look nice, talk a bit more about why its in a loop
 
 
 %Old stuff
