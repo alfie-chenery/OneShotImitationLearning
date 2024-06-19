@@ -175,7 +175,6 @@ def circmean(thetas):
         return x
 
 
-
 def computeError(points1, points2):    
     distances = np.linalg.norm(points1 - points2, axis=1)
     return np.mean(distances)
@@ -206,40 +205,50 @@ def extractCorrespondingKeypoints(img_live, img_init, displayMatches=True):
     if len(matchesGMS) == 0:
         raise NoKeypointsException("Could not match any keypoints")
 
-
-    #compute our own distance metric
-    # matches which largely disagree with the mean, should be removed
-    thetas = []
-    for m in matchesGMS:
-        x, y = kp_live[m.queryIdx].pt
-        u, v = kp_init[m.trainIdx].pt
-        thetas.append(np.arctan2(v-y, u-x))
-
-    avg_theta = circmean(thetas)
-
-    for i, m in enumerate(matchesGMS):
-        m.distance = abs(thetas[i] - avg_theta)
-
-
-
-    matchesGMS = sorted(matchesGMS, key=lambda x:x.distance)
-    # d = [x.distance for x in matchesGMS]
-    # dd = [b-a for (b,a) in zip(d[1:], d)]
-    # plt.plot(d, "b-", label="Match distance from mean")
-    # plt.plot(dd, "r-", label="Finite difference of match distance from mean")
-    # plt.title('Match distance from mean match in sorted list')
-    # plt.xlabel('Index of sorted list')
-    # plt.ylabel('Difference (Radians)')
-    # plt.legend(loc="upper left")
-    # plt.savefig(dir_path + "\\out\\fig.png")
-    # plt.show()
-
-    n = len(matchesGMS)
-
     if filter:
-        m = (3 * n)//4 # n//2
-        matchesGMS = matchesGMS[:m] # take only the best 3/4 of matches
-    # matchesGMS = matchesGMS[:1000]
+        #compute our own distance metric
+        # matches which largely disagree with the mean, should be removed
+        thetas = []
+        for m in matchesGMS:
+            x, y = kp_live[m.queryIdx].pt
+            u, v = kp_init[m.trainIdx].pt
+            thetas.append(np.arctan2(v-y, u-x))
+
+        avg_theta = circmean(thetas)
+
+        for i, m in enumerate(matchesGMS):
+            m.distance = abs(thetas[i] - avg_theta)
+
+        matchesGMS = sorted(matchesGMS, key=lambda x:x.distance)
+        x = [x.distance for x in matchesGMS]
+        dx = [b-a for (a,b) in zip(x, x[1:])]  #finite difference
+        n = len(x)
+
+        #==============================================
+        # filtering hyperparameters
+        filter_threshold = 0.05 
+        max_outliers = 0.3          # if more than this proportion are 'outliers' then dont remove them
+        #==============================================
+
+        potential_splits = [i for (i, d) in enumerate(dx) if d > filter_threshold] #if finite difference is more than threshold add index of this spike to list
+        # split = -1
+        for i in potential_splits:             # try all potential splits, check we arent trying to remove too many points
+            if i / n >= 1 - max_outliers:
+                matchesGMS = matchesGMS[:i]    # split just before the earliest candidate that passes
+                # split = i
+                break
+        
+        if displayMatches:
+            # plt.axvline(x=split)
+            plt.plot(x, "b-", label="Match distance from mean")
+            plt.plot(dx, "r-", label="Finite difference of match distance from mean")
+            plt.title('Match distance from mean match in sorted list')
+            plt.xlabel('Index of sorted list')
+            plt.ylabel('Difference (Radians)')
+            plt.legend(loc="upper left")
+            plt.savefig(dir_path + "\\out\\fig.png")
+            plt.show()
+
 
     print()
     print(len(matchesGMS))
@@ -277,19 +286,19 @@ print(f"Device: {device}")
 
 env = environment.FrankaArmEnvironment(videoLogging=False, out_dir=dir_path+"\\out")
 
-# keypointExtracter = cv2.ORB_create(10000, fastThreshold=0)
-keypointExtracter = cv2.SIFT_create()
-# keypointMatcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-keypointMatcher = cv2.BFMatcher(crossCheck=True)
+keypointExtracter = cv2.ORB_create(10000, fastThreshold=0)
+# keypointExtracter = cv2.SIFT_create()
+keypointMatcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+# keypointMatcher = cv2.BFMatcher(crossCheck=True)
 
 drawKeypointsInWorld = False
 showMatches = True
 
 gms = True
-filter = False
+filter = True
 
-ideal_t = np.array([0.05, 0.07, 0])
-ideal_R = env.getMatrixFromEuler([0, 0, -np.pi/4])
+ideal_t = np.array([0.09, 0.1, 0])
+ideal_R = env.getMatrixFromEuler([0, 0, -np.pi/6])
 
 
 # plt.ion()
