@@ -1,3 +1,8 @@
+import psutil
+import os
+process = psutil.Process(os.getpid())
+start_memory = process.memory_info().rss / 1024 / 1024  # in MiB
+
 import environment
 import torch
 import numpy as np 
@@ -6,9 +11,10 @@ from PIL import Image
 import cv2
 import pickle
 import glob
-import os
+import time
 import matplotlib.pyplot as plt
 import keyboard
+
 
 #Custom exception type
 class NoKeypointsException(Exception):
@@ -280,9 +286,8 @@ def extractCorrespondingKeypoints(img_live, img_init, displayMatches=True):
     return (points_live, points_init)
 
 
-
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-print(f"Device: {device}")
+# device = 'cuda' if torch.cuda.is_available() else 'cpu'
+# print(f"Device: {device}")
 
 env = environment.FrankaArmEnvironment(videoLogging=False, out_dir=dir_path+"\\out")
 
@@ -292,7 +297,7 @@ keypointMatcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
 # keypointMatcher = cv2.BFMatcher(crossCheck=True)
 
 drawKeypointsInWorld = False
-showMatches = True
+showMatches = False
 
 gms = True
 filter = True
@@ -302,6 +307,7 @@ ideal_R = env.getMatrixFromEuler([0, 0, -np.pi/6])
 
 
 # plt.ion()
+start_time = time.time()
 
 #take initial screenshot
 env.robotSaveCameraSnapshot("init", dir_path + "\\temp")
@@ -381,6 +387,8 @@ while error > ERR_THRESHOLD: # or iter < 2:
 
 
 plt.close()
+alignment_time = time.time() - start_time
+print(f"\nTime to align: {alignment_time} seconds\n")
 env.removeAllDebugLines()
 
 for i in range(50):
@@ -407,13 +415,22 @@ for keyFrame in range(len(demo_trace)):
     demo_pos, demo_orn, demo_gripper = demo_trace[keyFrame]
     desired_pos, desired_orn = env.offsetMovementLocal(demo_pos, demo_orn, offset_pos, offset_ornMat)
 
-    env.robotSetEefPosition(desired_pos, desired_orn, interpolationSteps=250)
+    env.robotSetEefPosition(desired_pos, desired_orn, interpolationSteps=100)
     env.robotCloseGripper() if demo_gripper else env.robotOpenGripper()
 
 
 
 for _ in range(200):
     env.stepEnv()
+
+# curr, peak = tracemalloc.get_traced_memory()
+# print(f"peak RAM usage: {peak / (1024*1024)} MiB")
+# tracemalloc.stop()
+
+peak_memory = process.memory_info().rss / 1024 / 1024  # in MiB
+print(f"Start Memory: {start_memory} MiB")
+print(f"Peak Memory: {peak_memory} MiB")
+
 
 # env.closeEnv()
 

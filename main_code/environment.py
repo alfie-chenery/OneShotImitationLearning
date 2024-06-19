@@ -118,10 +118,11 @@ class FrankaArmEnvironment:
         desiredAngles = desiredAngles[:self.numControlledJoints] 
         #If too many joints given, ignore the extras. We should only set the angles for the 7 joints we control.
         #The fixed joints should be ignored and gripper joints handled differenty
+        currAngles = self.robotGetJointAngles()
 
         for i in range(interpolationSteps):
             alpha = (i+1) / interpolationSteps
-            interpolatedPosition = [(1 - alpha) * prev + alpha * desired for prev, desired in zip(self.robotGetJointAngles(), desiredAngles)]
+            interpolatedPosition = [(1 - alpha) * prev + alpha * desired for prev, desired in zip(currAngles, desiredAngles)]
             forces = [500.0] * len(interpolatedPosition)
 
             p.setJointMotorControlArray(self.robotId, 
