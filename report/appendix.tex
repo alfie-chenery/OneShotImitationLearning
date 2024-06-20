@@ -22,9 +22,9 @@ As discussed in \refsec{sec:trajectories}, inverse kinematics will be an underde
 
 Fortunately for us, we saw that by having additional degrees of freedom, we can generate infinitely many solutions to the IK system. This means we could prune these invalid solutions by adding additional constraints. While it is possible this could make all solutions invalid, this is both unlikely and necessary. These invalid solutions remain because the current IK system does not perfectly capture our real world restrictions. If all solutions are removed by our additional constraints, then this simply means the desired end effector pose was not possible in a real world system.\\
 
-There are two additional types of constraints we can add. Firstly we can impose limits on each of the joints. This defines the maximum and minimum joint angles which can be achieved by a joint. For example, most joints will have a range of $-\pi$ to $pi$. This helps prevent an arm link from getting too close to other links by limiting its range of motion. The second type of constraint is to optimise the distance to a rest pose. The rest pose defines the joint angles in a typical neutral pose for the robot. When we try to move the end effector to a new position, the IK system will try to keep the joints as similar to this rest pose as possible, while still achieving the desired end effector position and orientation. This helps to prevent the IK system from choosing an unexpected pose to solve the system. The solution will be the one which looks most similar to the typical rest pose. We can dynamically decide this rest pose to influence the resulting solution. For example, defining a rest pose which keeps all links of the arm high, to prevent it from knocking over other objects on a table.\\
+There are two additional types of constraints we can add. Firstly we can impose limits on each of the joints. This defines the maximum and minimum joint angles which can be achieved by a joint. For example, most joints will have a range of $-\pi$ to $\pi$. This helps prevent an arm link from getting too close to other links by limiting its range of motion. The second type of constraint is to optimise the distance to a rest pose. The rest pose defines the joint angles in a typical neutral pose for the robot. When we try to move the end effector to a new position, the IK system will try to keep the joints as similar to this rest pose as possible, while still achieving the desired end effector position and orientation. This helps to prevent the IK system from choosing an unexpected pose to solve the system. The solution will be the one which looks most similar to the typical rest pose. We can dynamically decide this rest pose to influence the resulting solution. For example, defining a rest pose which keeps all links of the arm high, to prevent it from knocking over other objects on a table.\\
 
-This is referred to as null space inverse kinematics \cite{null-space}. We have a primary goal, to reach a desired end effector position and orientation. As mentioned the system is underdetermined, so there exist many possible solutions. The secondary goal is then achieved by operating within the null space of the first system. By definition, the null space, or kernel of the system is the solution space which gets mapped to the zero vector. This means that we can further refine a solution to the secondary goal, without impacting the primary goal, since all the changes we make necessarily have a result of 0 on the primary goal.
+This is referred to as null space inverse kinematics \cite{null-space}. We have a primary goal, to reach a desired end effector position and orientation. As mentioned the system is underdetermined, so there exist many possible solutions. The secondary goal is then achieved by operating within the null space of the first system. By definition, the null space, or kernel of the primary system is the solution space which gets mapped to the zero vector. This means that we can further refine a solution to the secondary goal, without impacting the primary goal, since all the changes we make necessarily have a result of 0 on the primary goal.
 
 
 \chapter{Evaluation Test Suite}
@@ -58,7 +58,7 @@ This appendix details specifics about the test suite used in \refchap{chap:evalu
         \includegraphics[width=\textwidth]{figures/matchDominoes.png}
         \caption{Domino objects}
     \end{subfigure}
-    \caption{Live and demonstration images used in test suite, with human marked keypoint matches}
+    \caption{Live and demonstration images used in the test suite, with human marked keypoint matches}
     \label{fig:testImages}
 \end{figure}
 
@@ -67,19 +67,18 @@ By analysing these images we can understand why some of the objects are more sen
 %TODO include observations from second test. ie which objects are forgiving, which fail more tests (i bet sphere)
 
 \subsubsection{Lego object}
-In this object the keypoints are marked as the 4 corners. It is very easy to identify these even when the object was rotated. This explains why this object had the lowest systematic error (as discussed in \refsec{sec:noise-test}) because the human error was very close to 0.
-
+In this object the keypoints are marked as the 4 corners. It is very easy to identify these even when the object was rotated. This explains why this object had the lowest systematic error (as discussed in \refsec{sec:noise-test}) because the human error was very close to 0.\
 \subsubsection{Mug object}
 In this object the keypoints are marked at even intervals around the mug, as well as the corners of the handle. However, in the demonstration image, the top of the mug is out of frame. This reduces how many keypoints we can identify. The circular nature of this object makes placing keypoints in the exact correct position more challenging.
 
 \subsubsection{Ball Object}
-This object is surprisingly difficult to mark keypoints given it is a perfect sphere. As such keypoints move in difficult to predict ways for a human keypoint matcher. Furthermore, the 
+This object is surprisingly difficult to mark keypoints given it is a perfect sphere. As such keypoints move in difficult to predict ways for a human keypoint matcher. Furthermore, the pattern of the ball changes quite significantly with the perspective of the camera, even though no rotation was applied.
 
 \subsubsection{Jenga block object}
 This object experienced the largest amount of systematic error by a large margin in \refsec{sec:noise-test}. Initially one might think that it should be easy to identify keypoints. Like with the Lego object, we may try to mark the corners of the block. However, in the demonstration image the top of the block is out of frame. This is deliberate to make the test more challenging for the system. As a result we can only mark the bottom two corners as keypoints. Instead we match identifiable points of the text on the object. This allows us to manually identify far more keypoints, the most of any object at 22.
 
 \subsubsection{Dominoes}
-This object is interesting because it is actually not a single object but multiple. The rotation applied in \reftab{tab:test-suite} is not applied about the centre like other objects. The line is rotated about the first domino. This presents some challenges for the robot since in order to knock over the domino line successfully it needs to rotate the vector it approaches at, unlike most objects where the angle of approach does not matter, provided the end effector is spun to the correct angle.\\
+This \socalled{object} is interesting because it is actually not a single object but multiple. The rotation applied in \reftab{tab:test-suite} is not applied about the centre like other objects. The line is rotated about the first domino. This presents some challenges for the robot since in order to knock over the domino line successfully it needs to rotate the vector it approaches at, unlike most objects where the angle of approach does not matter, provided the end effector is spun to the correct angle.\\
 
 In this test we can only identify a small number of keypoints since the majority of the domino line is out if frame.
 

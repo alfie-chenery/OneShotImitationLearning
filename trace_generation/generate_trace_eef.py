@@ -8,8 +8,8 @@ from controller import Controller
 def main():
     controller = Controller()
     env = environment.FrankaArmEnvironment()
-    # p.configureDebugVisualizer(p.COV_ENABLE_GUI,0)
-    # env.setDebugCameraState(1.3, 60.0, -42.0, [0.0, 0.2, 0.0])
+    p.configureDebugVisualizer(p.COV_ENABLE_GUI,0)
+    env.setDebugCameraState(1.3, 60.0, -42.0, [0.0, 0.2, 0.0])
 
     joystickSensitivity = 0.05 #scalar to slow down how much the joysticks move
     triggerSensitivity = 0.1

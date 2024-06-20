@@ -300,7 +300,7 @@ drawKeypointsInWorld = False
 showMatches = True
 
 gms = True
-filter = True
+filter = False
 
 ideal_t = np.array([0.09, 0.1, 0])
 ideal_R = env.getMatrixFromEuler([0, 0, -np.pi/6])

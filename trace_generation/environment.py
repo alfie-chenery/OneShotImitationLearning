@@ -16,6 +16,7 @@ class FrankaArmEnvironment:
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.setRealTimeSimulation(0)
         p.setGravity(0, 0, -10)
+        # p.configureDebugVisualizer(p.COV_ENABLE_GUI,0)
 
         self.videoLogging = videoLogging and (out_dir is not None)
         if self.videoLogging:
@@ -32,10 +33,9 @@ class FrankaArmEnvironment:
         self.robotId = p.loadURDF("franka_panda/panda.urdf", [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0], useFixedBase=True)
         self.tableId = p.loadURDF("table/table.urdf", [0.6, 0.0, -0.2], p.getQuaternionFromEuler([0.0, 0.0, np.pi/2]), useFixedBase=True)
 
-        self.objectId = p.loadURDF("urdf/mug.urdf", [0.5, -0.2, 0.45], p.getQuaternionFromEuler([0.0, 0.0, -np.pi/6]))
-
+        self.objectId = p.loadURDF("urdf/mug.urdf", [0.5, 0.0, 0.45], p.getQuaternionFromEuler([0.0, 0.0, -np.pi/6]))
         # self.objectId = p.loadURDF("lego/lego.urdf", [0.5, 0.05, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
-        # self.objectId = p.loadURDF("jenga/jenga.urdf", [0.5, 0.0, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
+        # self.objectId = p.loadURDF("jenga/jenga.urdf", [0.5, 0.0, 0.45], p.getQuaternionFromEuler([np.pi, 0.0, np.pi/3]))
 
         # self.objectId = p.loadURDF("sphere_small.urdf", [0.5, 0.07, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
         # p.changeVisualShape(self.objectId, -1, rgbaColor=[0, 1, 1, 1])
@@ -118,10 +118,11 @@ class FrankaArmEnvironment:
         desiredAngles = desiredAngles[:self.numControlledJoints] 
         #If too many joints given, ignore the extras. We should only set the angles for the 7 joints we control.
         #The fixed joints should be ignored and gripper joints handled differenty
+        currAngles = self.robotGetJointAngles()
 
         for i in range(interpolationSteps):
             alpha = (i+1) / interpolationSteps
-            interpolatedPosition = [(1 - alpha) * prev + alpha * desired for prev, desired in zip(self.robotGetJointAngles(), desiredAngles)]
+            interpolatedPosition = [(1 - alpha) * prev + alpha * desired for prev, desired in zip(currAngles, desiredAngles)]
             forces = [500.0] * len(interpolatedPosition)
 
             p.setJointMotorControlArray(self.robotId, 
@@ -191,10 +192,6 @@ class FrankaArmEnvironment:
 
         newPos = (np.array(pos) + np.array(translation)).tolist()
 
-        #pos = pos + orn.translation
-        # this should make the translation be in eef space not global.
-        # so then rotation AND translation should both be backwards because eef upside down
-        # if they are consistent then I can just slap it with a -1. Its the fact translation is fine but rotation wrong that makes it hard.
         return (newPos, newOrn)
     
 
@@ -226,8 +223,8 @@ class FrankaArmEnvironment:
         rotationMatrix = self.getMatrixFromQuaternion(orn)
 
         # Initial vectors
-        initCameraVector = (0, 0, 1) # z-axis
-        initUpVector = (0, 1, 0) # y-axis
+        initCameraVector = (0, 0, 1)  # Z axis
+        initUpVector = (0, 1, 0)      # Y axis
         # Rotated vectors
         cameraVector = rotationMatrix.dot(initCameraVector)
         upVector = rotationMatrix.dot(initUpVector)
