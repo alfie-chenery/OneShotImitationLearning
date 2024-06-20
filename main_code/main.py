@@ -297,7 +297,7 @@ keypointMatcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
 # keypointMatcher = cv2.BFMatcher(crossCheck=True)
 
 drawKeypointsInWorld = False
-showMatches = False
+showMatches = True
 
 gms = True
 filter = True

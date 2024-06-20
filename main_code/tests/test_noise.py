@@ -244,7 +244,7 @@ line_of_best_fit = False
 numRuns = 1000 if noise_mode == "pixel_noise" else 100
 items = ["Lego", "Mug", "Ball", "Jenga", "Dominoes"]
 colours = ["tab:olive", "tab:red", "tab:blue", "tab:purple", "tab:green"]
-noiseAmounts = [0] + (np.arange(0, 20.1, 0.1).tolist() if noise_mode == "pixel_noise" else np.arange(0, 0.201, 0.001).tolist())
+noiseAmounts = [0] + (np.arange(0, 101, 2).tolist() if noise_mode == "pixel_noise" else np.arange(0, 0.201, 0.001).tolist())
 #list(range(0,21,1))
 #=============================================================================================
 

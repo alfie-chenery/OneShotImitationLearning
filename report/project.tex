@@ -78,7 +78,7 @@ However it is worth considering that in this case an end effector pose does not 
     \label{fig:underdetermined}
 \end{figure}
 
-While this initially seems like a big problem, for our purposes we truly do only care that the end effector is in the position and orientation we specify. Any of the satisfying robot poses will do. Working with the end effector pose directly also simplifies a lot of our work later on. We will see in \refsec{sec:alignment} that a lot of our calculations will involve the end effector pose. While we could compute this using forward kinematics if the demonstration instead stored joint angles, this would be an unnecessary extra step for no real benefit to the accuracy of the system. A way to use the underdetermined nature of the system to our advantage is explored further in \refapx{apx:null-space}.\\
+While this initially seems like a big problem, for our purposes we truly do only care that the end effector is in the position and orientation we specify. Any of the satisfying robot poses will do. Working with the end effector pose directly also simplifies a lot of our work later on. We will see in \refsec{sec:alignment} that a lot of our calculations will involve the end effector pose. While we could compute this using forward kinematics if the demonstration instead stored joint angles, this would be an unnecessary extra step for no real benefit to the accuracy of the system. A way to use the underdetermined nature of the IK system to our advantage is explored further in \refapx{apx:null-space}.\\
 
 We may optionally decide to also include velocity information in addition to positional information. This would allow us to specify that the robot should have an exact position, but also describe how it should move in the next time step. While this may be useful for very specific tasks like throwing an object to hit an exact target; for the majority of tasks, velocity information is simply not necessary when we have the position for the next key frame already defined. If we were to save a key frame every time step, then the velocity information would be completely redundant, with velocity being directly computable as the displacement between the two key frames divided by the time step. In practice, for usability, we opt to not do this and only record key frames when deemed necessary by the user during the demonstration. While this does mean velocity information is not directly knowable, we decide that velocity information is not necessary for the simple tasks we are experimenting with in this paper.\\
 
@@ -156,7 +156,7 @@ Where $W$ and $H$ are the width and height of the image captured. These values a
 \section{Implementation Overview}
 \label{sec:implementation}
 
-\reffig{fig:pipeline} shows an overview of the pipeline developed in this paper. The first step of the algorithm is to select the demonstration to follow. The robot will look at every demonstration image in its training corpus, and select the one which is most similar to the current environment. It will then compare this demonstration image to the live image taken by the robot's camera. From these two images the system then extracts keypoints, and uses these to compute the transformation which has been applied to the object. This offset is then applied to the end effector, transforming the demonstration trajectory into this new environment. The robot can then execute this transformed trajectory, completing the task. The following sections detail the specifics of each module of the pipeline.
+\reffig{fig:pipeline} shows an overview of the pipeline developed in this paper. The first step of the algorithm is to select the demonstration to follow. The robot will look at every demonstration image in its training corpus, and select the one which is most similar to the current environment. It will then compare this demonstration image to the live image taken by the robot's camera. From these two images LiteBot then extracts keypoints, and uses these to compute the transformation which has been applied to the object. This offset is then applied to the end effector, transforming the demonstration trajectory into this new environment. The robot can then execute this transformed trajectory, completing the task. The following sections detail the specifics of each module of the pipeline.
 
 \begin{figure}[h]
     \centering
@@ -169,7 +169,7 @@ Where $W$ and $H$ are the width and height of the image captured. These values a
 \label{sec:demo-selection}
 The first step of implementation comes before we can even consider the trajectory transfer function. We first need to consider its inputs. $f$ takes as parameter the task trajectory $\tau$, the original environment context $\Sigma$ and the context of the new test time environment $\Sigma'$. While $\Sigma'$ can be directly observed from the test time environment, $\tau$ and $\Sigma$ are dependent on the demonstration we choose to follow.\\
 
-We want the system to be able to learn multiple tasks independent of each other and apply the correct task to a given scene. We do not want the human to have to tell the robot what it should do with the objects. The robot should be able to infer the task from the objects alone. More specifically, from the environment observation $\Sigma'$.
+We want LiteBot to be able to learn multiple tasks independent of each other and apply the correct task to a given scene. We do not want the human to have to tell the robot what it should do with the objects. The robot should be able to infer the task from the objects alone. More specifically, from the environment observation $\Sigma'$.
 The robot will have access to a pre-trained corpus of demonstrations. The \socalled{One-shot} nature of this system refers to each task only requiring a single demonstration to be learned. However, to teach multiple tasks, a new demonstration for each task is still required. Each of these demonstrations has associated with it, the environment context $\Sigma$. Deciding which task to complete in the new environment is a matter of comparing the context image of each demonstration, to the live image the robot takes upon being presented with the environment. For this purpose, only the RGB image is used, the depth information and view matrix are ignored for now.\\
 
 In order to compare the images, N. Di Palo and E. Johns opt to embed both images using a vision transformer created by Meta (formerly known as Facebook) called \socalled{Dino} \cite{dino-paper}. The transformer produces a 768-vector, and we can directly compare the embedding vector of different images using cosine similarity. Whichever embedding has highest similarity to the live embedding, corresponds to the context image being most similar to the live image. The hope is that the transformer extracts useful information regarding the relevant parts of the image, such as the general make-up of objects within the scene, while ignoring less important information like the positional information of objects.\\
@@ -310,7 +310,7 @@ The key principle of GMS is to divide the image into a grid and analyze the dist
 
 This is perfect for our use case since provided the demonstration selection stage has worked as intended, the object will be the same in both images. Furthermore, the assumption GMS relies is one we have already taken. We have already assumed that the object in both images has simply been translated and rotated between the live and demonstration image. We already mentioned in \refsec{sec:keypoints} that we are using these keypoints to try to recover this transformation. As such, by using GMS we filter out keypoint matches which specifically contradict this assumption, leading to much more stable results when computing the transformations. This is demonstrated in \refchap{chap:evaluation}.
 
-\subsubsection{Consensus Filtering}
+\subsubsection{Outlier Filtering}
 While GMS is very good at computing consistent keypoint matches, it still can have some difficulty with large groups of inconsistent matches, since GMS only filters out matches which disagree with its local neighbours. This is great as a first pass and serves to remove the majority of high frequency noisy matches. However, the grid based structure of GMS, means that individual grid cells can often disagree with each other. This is low frequency noise, where collections of matches disagree with other collections.\\
 
 \begin{figure}[h]
@@ -323,7 +323,7 @@ While GMS is very good at computing consistent keypoint matches, it still can ha
     \hfill
     \begin{subfigure}[t]{0.49\textwidth}
         \includegraphics[width=\textwidth]{figures/outliers-gms+ours.png}
-        \caption{Keypoint matches using GMS + consensus filtering}
+        \caption{Keypoint matches using GMS + outlier filtering}
         \label{fig:outliers-gms+filter}
     \end{subfigure}
     \caption{Our method further improves the consistency of keypoints}
@@ -337,11 +337,11 @@ While GMS is very good at computing consistent keypoint matches, it still can ha
     \label{fig:bad-matches}
 \end{figure}
 
-\reffig{fig:consensus-filtering} shows example keypoint matching using GMS, before and after applying consensus filtering. We can see that in \reffig{fig:outliers-gms}, there is a collection of keypoints which match incorrectly. The object has moved diagonally, as most matches correctly identify. However, this collection correspond to a more horizontal translation. Our filtering method successfully removes these incorrect matches, while retaining the correct matches.\\
+\reffig{fig:consensus-filtering} shows example keypoint matching using GMS, before and after applying outlier filtering. We can see that in \reffig{fig:outliers-gms}, there is a collection of keypoints which match incorrectly. The object has moved diagonally, as most matches correctly identify. However, this collection correspond to a more horizontal translation. Our filtering method successfully removes these incorrect matches, while retaining the correct matches.\\
 
 In this paper we develop an additional measure to improve our keypoint matches. We further eliminate outliers to refine keypoint matches by considering all matches, not just those within a grid cell. After applying GMS to obtain an initial set of matches, this algorithm performs an additional filtering step based on vector analysis of the keypoint coordinates. We start by considering keypoint matches as vectors within image space. If a keypoint at $(x,y)$ in image one, matches to a keypoint at $(x',y')$ in image two, then we consider the match as the vector from $(x,y)$ to $(x'y')$. This is the line you would get by connecting the keypoints if the two images were superimposed on top of each other. By considering keypoint matches as vectors in image space, we can consider these vectors as describing how the object moved between the images. This is not a direct calculation of the translation and rotation, since we make no assumption that the camera which took the images was in the same pose in world space. However, we are still able to perform some filtering on these vectors regardless.\\
 
-To identify and remove outliers, we examine the gradient and magnitude of each vector relative to the mean values. Matches that deviate significantly from the mean are considered potential outliers. Specifically, we order the matches based on how much they differ from the mean vector. We then compute the finite difference between consecutive ordered pairs of match vectors. This allows us to see how quickly the derivative changes. The algorithm looks for spikes in the derivative, which indicate sudden changes in the gradient or magnitude that are inconsistent with the overall motion pattern. If the spike is significant enough then we split the ordered list at this point. If the shorter set is significantly smaller than the larger set, then we determine that the shorter set are outliers, and we remove them. \reffig{fig:bad-matches} shows a plot of distance from the mean and the finite difference for the images shown in \reffig{fig:consensus-filtering}\\
+To identify and remove outliers, we examine the gradient of each vector relative to the mean values. Matches that deviate significantly from the mean are considered potential outliers. Specifically, we order the matches based on how much they differ from the mean vector. We then compute the finite difference between consecutive ordered pairs of match vectors. This allows us to see how quickly the derivative changes. The algorithm looks for spikes in the derivative, which indicate sudden changes in the gradient that are inconsistent with the overall motion pattern. We record the index of all points where the gradient spikes more than some hyperparameter threshold. We then check each spike from left to right ensuring that if we were to split here, we wouldn't remove too many keypoints. The justification for this additional test is that if the potential outliers held a majority or close to it, then we would conclude that these points are not in fact outliers. If a potential split would remove too many keypoints, but there are later spikes, then we check each spike until the first one passes. Only once a spike passes both tests do we split the list at this point, and discard the matches with a mean distance higher than that of the split point. \reffig{fig:bad-matches} shows a plot of distance from the mean and the finite difference for the images shown in \reffig{fig:consensus-filtering}\\
 
 \begin{figure}[H]
     \centering
@@ -353,7 +353,7 @@ To identify and remove outliers, we examine the gradient and magnitude of each v
     \hfill
     \begin{subfigure}[t]{0.49\textwidth}
         \includegraphics[width=\textwidth]{figures/inliers-gms+ours.png}
-        \caption{Keypoint matches using GMS + consensus filtering}
+        \caption{Keypoint matches using GMS + outlier filtering}
         \label{fig:inliers-gms+filter}
     \end{subfigure}
     \caption{Our method only removes outlier matches}
@@ -367,12 +367,12 @@ To identify and remove outliers, we examine the gradient and magnitude of each v
     \label{fig:good-matches}
 \end{figure}
 
-It is important to analyse the derivative and not just remove the vectors furthest from the mean. This is because if a rotation is present then the vectors will not agree perfectly on their orientation and magnitude. However, these changes should be smooth in the ordered list of matches, since a rotation would affect all vectors proportional to their distance from the centre of rotation. These matches are not outliers and should not be removed. As such, only when the finite difference changes drastically can we accuse the matches of being outliers. \reffig{fig:consensus-filtering2} shows an object which has been rotated. For this object the matches are very accurate and consistent. Consensus filtering removes very few matches as outliers. We can see in \reffig{fig:good-matches} that this corresponds to a smooth increase in the distance from the mean. As such the derivative is much more stable.\\
+It is important to analyse the derivative and not just remove the vectors furthest from the mean. This is because if a rotation is present then the vectors will not agree perfectly on their orientation and magnitude. However, these changes should be smooth in the ordered list of matches, since a rotation would affect all vectors proportional to their distance from the centre of rotation. These matches are not outliers and should not be removed. As such, only when the finite difference changes drastically can we accuse the matches of being outliers. \reffig{fig:consensus-filtering2} shows an object which has been rotated. For this object the matches are very accurate and consistent. Outlier filtering removes very few matches as outliers. We can see in \reffig{fig:good-matches} that this corresponds to a smooth increase in the distance from the mean. As such the derivative is much more stable.\\
 
 In \refchap{chap:evaluation} we compare the effectiveness of each keypoint algorithm with each matching algorithm, to determine the best combination of algorithms for use in this project.\\
 
 %TODO these figures are being placed in the next section. Not ideal, try to fix
-
+% it kinda fixed, check before final submission
 
 
 \section{Calculating end effector offset}
@@ -475,7 +475,7 @@ With each of these modules defined, we can consider the algorithm as a whole. Fo
 
 \begin{algorithm}
     \setlength{\baselineskip}{18pt}
-    \caption{\textbf{Lightweight One-shot Imitation Learning algorithm}}
+    \caption{\textbf{LiteBot: A lightweight One-shot Imitation Learning algorithm}}
     \label{alg:whole-system}
     \begin{algorithmic}[1]
         \Require $\mathcal{D} = \{[\tau, I^{(RGB)}, I^{(D)}, V]\}$ \Comment{set of training demonstrations}

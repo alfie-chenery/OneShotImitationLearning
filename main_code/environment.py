@@ -192,10 +192,6 @@ class FrankaArmEnvironment:
 
         newPos = (np.array(pos) + np.array(translation)).tolist()
 
-        #pos = pos + orn.translation
-        # this should make the translation be in eef space not global.
-        # so then rotation AND translation should both be backwards because eef upside down
-        # if they are consistent then I can just slap it with a -1. Its the fact translation is fine but rotation wrong that makes it hard.
         return (newPos, newOrn)
     
 
@@ -227,8 +223,8 @@ class FrankaArmEnvironment:
         rotationMatrix = self.getMatrixFromQuaternion(orn)
 
         # Initial vectors
-        initCameraVector = (0, 0, 1) # z-axis
-        initUpVector = (0, 1, 0) # y-axis
+        initCameraVector = (0, 0, 1)  # Z axis
+        initUpVector = (0, 1, 0)      # Y axis
         # Rotated vectors
         cameraVector = rotationMatrix.dot(initCameraVector)
         upVector = rotationMatrix.dot(initUpVector)
