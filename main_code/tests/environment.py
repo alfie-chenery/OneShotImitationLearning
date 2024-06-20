@@ -360,6 +360,14 @@ class FrankaArmEnvironment:
             line[2] = offset
 
 
+    def disableHUD(self):
+        p.configureDebugVisualizer(p.COV_ENABLE_GUI,0)
+
+
+    def enableHud(self):
+        p.configureDebugVisualizer(p.COV_ENABLE_GUI,1)
+
+
 
 
 #Testing
