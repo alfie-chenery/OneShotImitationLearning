@@ -33,7 +33,7 @@ class FrankaArmEnvironment:
         self.robotId = p.loadURDF("franka_panda/panda.urdf", [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0], useFixedBase=True)
         self.tableId = p.loadURDF("table/table.urdf", [0.6, 0.0, -0.2], p.getQuaternionFromEuler([0.0, 0.0, np.pi/2]), useFixedBase=True)
 
-        self.objectId = p.loadURDF("urdf/mug.urdf", [0.5, 0.0, 0.45], p.getQuaternionFromEuler([0.0, 0.0, -np.pi/6]))
+        self.objectId = p.loadURDF("urdf/mug.urdf", [0.2, -0.30, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi * 1.2]))
         # self.objectId = p.loadURDF("lego/lego.urdf", [0.5, 0.05, 0.45], p.getQuaternionFromEuler([0.0, 0.0, np.pi/3]))
         # self.objectId = p.loadURDF("jenga/jenga.urdf", [0.5, 0.0, 0.45], p.getQuaternionFromEuler([np.pi, 0.0, np.pi/3]))
 
@@ -358,6 +358,14 @@ class FrankaArmEnvironment:
             end = start + offset + 0.05 * np.array(direction)
             line[0] = p.addUserDebugLine(start + offset, end, colour, replaceItemUniqueId=lineId)
             line[2] = offset
+
+
+    def disableHUD(self):
+        p.configureDebugVisualizer(p.COV_ENABLE_GUI,0)
+
+
+    def enableHud(self):
+        p.configureDebugVisualizer(p.COV_ENABLE_GUI,1)
 
 
 

@@ -82,9 +82,11 @@ Having reviewed the current literature, we now cover some preliminary knowledge 
 
 \section{Preliminaries: Rotations and Orientations}
 \label{sec:rotations}
-Throughout this report best effort will be made to not confuse the terms \socalled{rotation} and \socalled{orientation}. While mathematically these terms are represented identically, they have different semantic interpretations. As such the language within this paper will be consistent with the following definitions:\\
-A \textbf{rotation} is a function which refers to the circular movement of an object around a central point or axis.\\ %TODO come up with better def of rotation
-An \textbf{orientation} is an angular displacement relative to an agreed upon reference frame. It is the resulting state after a rotation is applied to a body which was initially in the starting reference frame. Typically the base orientation will be such that the object's local coordinate frame aligns with the world coordinate frame. The object's orientation is then the rotation about the object's local origin, which aligns the world reference frame with the object's local reference frame.\\
+Throughout this report best effort will be made to not confuse the terms \socalled{rotation} and \socalled{orientation}. While mathematically these terms are represented identically, they have different semantic interpretations. As such the language within this paper will be consistent with the following definitions:
+\begin{itemize}
+    \item \textbf{Rotation:} a function which refers to the circular movement of an object around a central point or axis.
+    \item \textbf{Orientation:} an angular displacement relative to an agreed upon reference frame. It is the resulting state after a rotation is applied to a body which was initially in the starting reference frame. Typically the base orientation will be such that the object's local coordinate frame aligns with the world coordinate frame. The object's orientation is then the rotation about the object's local origin, which aligns the world reference frame with the object's local reference frame.
+\end{itemize}
 
 From these definitions we can realise that to find an object's new orientation following a rotation, we compose the applied rotation with the object's previous orientation. This results in the total rotation which maps the object from the base reference frame to its new local frame, which is by our definition, its new orientation.\\
 

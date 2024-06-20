@@ -6,10 +6,12 @@ import os
 from controller import Controller
 
 def main():
+    dir_path = os.path.dirname(os.path.abspath(__file__))
+
     controller = Controller()
-    env = environment.FrankaArmEnvironment()
-    p.configureDebugVisualizer(p.COV_ENABLE_GUI,0)
-    env.setDebugCameraState(1.3, 60.0, -42.0, [0.0, 0.2, 0.0])
+    env = environment.FrankaArmEnvironment(videoLogging=False, out_dir=dir_path + "\\out")
+    # p.configureDebugVisualizer(p.COV_ENABLE_GUI,0)
+    # env.setDebugCameraState(1.3, 60.0, -42.0, [0.0, 0.2, 0.0])
 
     joystickSensitivity = 0.05 #scalar to slow down how much the joysticks move
     triggerSensitivity = 0.1
@@ -103,7 +105,6 @@ def main():
     print(trace)
     
     if saveTrace:
-        dir_path = os.path.dirname(os.path.abspath(__file__))
         path = os.path.join(dir_path, "demonstration.pkl")
         with open(path, 'wb') as f:
             pickle.dump(trace, f)
