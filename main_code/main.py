@@ -245,7 +245,7 @@ def extractCorrespondingKeypoints(img_live, img_init, displayMatches=True):
         
         if displayMatches:
             if split != -1:
-                plt.axvline(x=split)
+                plt.axvline(x=split, color="black", linestyle="--")
 
             plt.plot(x, "b-", label="Match distance from mean")
             plt.plot(dx, "r-", label="Finite difference of match distance from mean")
@@ -305,6 +305,8 @@ showMatches = True
 
 gms = True
 filter = True
+
+interpolationSteps = 200
 
 # ideal_t = np.array([0.09, 0.1, 0])
 # ideal_R = env.getMatrixFromEuler([0, 0, -np.pi/6])
@@ -419,7 +421,7 @@ for keyFrame in range(len(demo_trace)):
     demo_pos, demo_orn, demo_gripper = demo_trace[keyFrame]
     desired_pos, desired_orn = env.offsetMovementLocal(demo_pos, demo_orn, offset_pos, offset_ornMat)
 
-    env.robotSetEefPosition(desired_pos, desired_orn, interpolationSteps=200)
+    env.robotSetEefPosition(desired_pos, desired_orn, interpolationSteps=interpolationSteps)
     env.robotCloseGripper() if demo_gripper else env.robotOpenGripper()
 
 
