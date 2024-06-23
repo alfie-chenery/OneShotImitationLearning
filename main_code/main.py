@@ -237,15 +237,16 @@ def extractCorrespondingKeypoints(img_live, img_init, displayMatches=True):
         #==============================================
 
         potential_splits = [i for (i, d) in enumerate(dx) if d > filter_threshold] #if finite difference is more than threshold add index of this spike to list
-        # split = -1
+        split = -1
         for i in potential_splits:             # try all potential splits, check we arent trying to remove too many points
             if i / n >= 1 - max_outliers:
-                matchesGMS = matchesGMS[:i]    # split just before the earliest candidate that passes
-                # split = i
+                split = i
                 break
         
         if displayMatches:
-            # plt.axvline(x=split)
+            if split != -1:
+                plt.axvline(x=split)
+
             plt.plot(x, "b-", label="Match distance from mean")
             plt.plot(dx, "r-", label="Finite difference of match distance from mean")
             plt.title('Match distance from mean match in sorted list')
@@ -254,6 +255,8 @@ def extractCorrespondingKeypoints(img_live, img_init, displayMatches=True):
             plt.legend(loc="upper left")
             plt.savefig(dir_path + "\\out\\fig.png")
             plt.show()
+
+        matchesGMS = matchesGMS[:split]    # split just before the earliest candidate that passes
 
 
     print()
@@ -290,6 +293,7 @@ def extractCorrespondingKeypoints(img_live, img_init, displayMatches=True):
 # print(f"Device: {device}")
 
 env = environment.FrankaArmEnvironment(videoLogging=False, out_dir=dir_path+"\\out")
+np.random.seed(17)
 
 keypointExtracter = cv2.ORB_create(10000, fastThreshold=0)
 # keypointExtracter = cv2.SIFT_create()
@@ -300,10 +304,10 @@ drawKeypointsInWorld = False
 showMatches = True
 
 gms = True
-filter = False
+filter = True
 
-ideal_t = np.array([0.09, 0.1, 0])
-ideal_R = env.getMatrixFromEuler([0, 0, -np.pi/6])
+# ideal_t = np.array([0.09, 0.1, 0])
+# ideal_R = env.getMatrixFromEuler([0, 0, -np.pi/6])
 
 
 # plt.ion()
@@ -403,10 +407,10 @@ for i in range(50):
 
 print(f"Alligned offset:\n  Translation:{offset_pos},\n  Rotation (matrix):\n{offset_ornMat}\n Rotation (euler):{env.getEulerFromMatrix(offset_ornMat)}\n")
 
-print()
-print(distance_error(offset_pos, ideal_t))
-print(rotation_error(offset_ornMat, ideal_R, degrees=True))
-print()
+# print()
+# print(distance_error(offset_pos, ideal_t))
+# print(rotation_error(offset_ornMat, ideal_R, degrees=True))
+# print()
 
 
 
@@ -415,21 +419,17 @@ for keyFrame in range(len(demo_trace)):
     demo_pos, demo_orn, demo_gripper = demo_trace[keyFrame]
     desired_pos, desired_orn = env.offsetMovementLocal(demo_pos, demo_orn, offset_pos, offset_ornMat)
 
-    env.robotSetEefPosition(desired_pos, desired_orn, interpolationSteps=100)
+    env.robotSetEefPosition(desired_pos, desired_orn, interpolationSteps=200)
     env.robotCloseGripper() if demo_gripper else env.robotOpenGripper()
-
 
 
 for _ in range(200):
     env.stepEnv()
 
-# curr, peak = tracemalloc.get_traced_memory()
-# print(f"peak RAM usage: {peak / (1024*1024)} MiB")
-# tracemalloc.stop()
 
 peak_memory = process.memory_info().rss / 1024 / 1024  # in MiB
-print(f"Start Memory: {start_memory} MiB")
-print(f"Peak Memory: {peak_memory} MiB")
+# print(f"Start Memory: {start_memory} MiB")
+# print(f"Peak Memory: {peak_memory} MiB")
 
 
 # env.closeEnv()
