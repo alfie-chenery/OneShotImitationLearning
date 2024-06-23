@@ -3,7 +3,8 @@
 
 Final Year Project
 Project repo: https://github.com/alfie-chenery/OneShotImitationLearning
-  
+
+I have been the sole contributor to this repo and it has remained private until 23/06/24 where it has been made public for the purposes of allowing yourself and the marking team to view the repo. Once a mark is awarded for the project, or I am informed that access is no longer required by the marking team. I intend to make the repo private again, where it will become a personal project of mine as I look to implement the ideas I discussed in the future work section of the report.
   
 
 ## Setting up and running the code
@@ -38,3 +39,4 @@ The repo is separated into different directories which each serve generally diff
 - `figures\` contains some of the figures used in the report and the files used to generate them.
 - `videos\` contains some video logs of runs of the main code. 
 - `report\` contains a back-up of the report accompanying this project. It should be up to date with the version submitted. If this is not the case for whatever reason, ignore the contents of this directory, the separately submitted version is the correct version.
+- `test_codes\` contains random testing files used throughout the project. They are included for documentation purposes, but serve no direct connection to the main code, except the knowledge gained influencing the design.
