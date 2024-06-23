@@ -1,33 +1,63 @@
 \appendix
-\chapter{Null space inverse kinematics}
-\label{apx:null-space}
-As discussed in \refsec{sec:trajectories}, inverse kinematics will be an underdetermined system if the number of controllable joints exceeds the degrees of freedom of the desired end effector pose. This has the effect of having infinitely many, all equally valid robot poses which achieve the desired end effector position. However, this is only in theory. Consider \reffig{fig:ik-invalid}. Here we can see that the solution requires two of the arm links to intersect. While this is fine in theory and does constitute a solution to the IK system, in the real world the links of the robot arm are not infinitely thin line segments, they are physical parts with thickness. If this robot was in the real world this would require parts of the robot to pass through each other. This is obviously impossible in a real situation.
+\chapter{Ethical considerations}
+\label{apx:ethics}
+The system developed in this paper does not present any serious ethical concerns.\\
+
+This project does not work directly with people or animals. However, there could be safety considerations if deploying to a physical robot arm. These potential safety concerns are a consequence of using any robot arm and are not specific to this project. As such normal safety protocol in remaining clear of the robot arm during operation would be sufficient.\\
+
+There are no legal or licensing concerns with this project. All libraries used are open source and can be installed through the default Python package manager: \socalled{pip}.\\
+
+A widely generalisable learning agent will be applicable to many scenarios and tasks, some of which may be malicious in nature. While it is possible that work from this project could be taken and misused to teach a robot morally questionable tasks, this is not the intended use or focus of this project.\\
+
+Finally while this project does not directly focus on environmental issues, we should consider the energy used running the simulations and equipment. While this is a non-zero amount, it is for the purposes of research and well within reasonable limits. Furthermore, this paper specifically focuses on producing a robot learning algorithm with lower hardware requirements to run effectively. This allows our system to run on lower power and more efficient machines than previously possible. While this is undoubtedly a benefit of the solution presented, reducing the environmental impacts is not the focus of this paper.
+
+
+\chapter{The right hand rule}
+\label{apx:right-hand-rule}
+The right hand rule refers to a convention defining the positive direction for rotation about an axis. While using your right hand to make a \socalled{thumbs up pose}, your thumb represents the positive direction of the axis of rotation, and your fingers curl in the direction of positive rotation. This can be seen in \reffig{fig:right-hand-rule}.\\
 
 \begin{figure}[h]
     \centering
-    \begin{subfigure}[b]{0.45\textwidth}
+    \includegraphics[width=0.6\textwidth]{figures/right-hand-rule.png}
+    \caption{The right hand rule for rotation}
+    \label{fig:right-hand-rule}
+\end{figure}
+
+We note that if we were to invert our hand, so that our thumb points in the opposite direction, then the fingers now curl in the opposite direction relative to the initial axis. Therefore we can imagine if we were to rotate in the negative direction about this inverted vector, we would achieve the same rotation as before. This is to say a positive rotation about some vector is equivalent to a negative rotation about the negation of the vector.\\
+
+This is the reason that quaternions (as discussed in \refsubsec{subsec:quaternions}) are considered a \socalled{double cover} of 3D rotations, since these two constructions describe the same rotation, but are represented by exactly 2 distinct quaternions, q and -q.
+$$ q = \cos{\frac{\theta}{2}} + v\sin{\frac{\theta}{2}} \longspace and \longspace -q = -\cos{\frac{\theta}{2}} - v\sin{\frac{\theta}{2}}$$
+
+
+\chapter{Null space inverse kinematics}
+\label{apx:null-space}
+As discussed in \refsec{sec:trajectories}, inverse kinematics will be an underdetermined system if the number of controllable joints exceeds the degrees of freedom of the desired end effector pose. This has the effect of having infinitely many, all equally valid robot poses which achieve the desired end effector position. However, this is only in theory. Consider \reffig{fig:ik-invalid}. Here we can see that the solution requires two of the arm links to intersect. While this is fine in theory and does constitute a solution to the inverse kinematics system, in the real world the links of the robot arm are not infinitely thin line segments, they are physical parts with thickness. If this robot was in the real world this would require parts of the robot to pass through each other. This is obviously impossible in a real situation. As before, we consider the simpler 2-dimensional case, however the concept extends to 3 dimensions.
+
+\begin{figure}[h]
+    \centering
+    \begin{subfigure}[t]{0.45\textwidth}
         \includegraphics[width=\textwidth]{figures/ik-valid.png}
-        \caption{A valid IK solution}
+        \caption{A valid inverse kinematics solution}
         \label{fig:ik-valid}
     \end{subfigure}
     \hfill
-    \begin{subfigure}[b]{0.45\textwidth}
+    \begin{subfigure}[t]{0.45\textwidth}
         \includegraphics[width=\textwidth]{figures/ik-invalid.png}
-        \caption{An invalid IK solution}
+        \caption{An invalid inverse kinematics solution}
         \label{fig:ik-invalid}
     \end{subfigure}
-    \caption{Not all IK solutions may be valid}
+    \caption{Not all inverse kinematics solutions may be valid}
     \label{fig:ik-null-space}
 \end{figure}
 
-Fortunately for us, we saw that by having additional degrees of freedom, we can generate infinitely many solutions to the IK system. This means we could prune these invalid solutions by adding additional constraints. While it is possible this could make all solutions invalid, this is both unlikely and necessary. These invalid solutions remain because the current IK system does not perfectly capture our real world restrictions. If all solutions are removed by our additional constraints, then this simply means the desired end effector pose was not possible in a real world system.\\
+Fortunately for us, we saw that by having additional degrees of freedom, we can generate infinitely many solutions to the inverse kinematics system. This means we could prune these invalid solutions by adding additional constraints. While it is possible this could make all solutions invalid, this is both unlikely and necessary. These invalid solutions remain because the current inverse kinematics system does not perfectly capture our real world restrictions. If all solutions are removed by our additional constraints, then this simply means the desired end effector pose was not possible in a real world system.\\
 
-There are two additional types of constraints we can add. Firstly we can impose limits on each of the joints. This defines the maximum and minimum joint angles which can be achieved by a joint. For example, most joints will have a range of $-\pi$ to $\pi$. This helps prevent an arm link from getting too close to other links by limiting its range of motion. The second type of constraint is to optimise the distance to a rest pose. The rest pose defines the joint angles in a typical neutral pose for the robot. When we try to move the end effector to a new position, the IK system will try to keep the joints as similar to this rest pose as possible, while still achieving the desired end effector position and orientation. This helps to prevent the IK system from choosing an unexpected pose to solve the system. The solution will be the one which looks most similar to the typical rest pose. We can dynamically decide this rest pose to influence the resulting solution. For example, defining a rest pose which keeps all links of the arm high, to prevent it from knocking over other objects on a table.\\
+There are two additional types of constraints we can add. Firstly we can impose limits on each of the joints. This defines the minimum and maximum joint angles which can be achieved by a joint. For example, most joints will have a range of $-\pi$ to $\pi$. This helps prevent an arm link from getting too close to other links by limiting its range of motion. The second type of constraint is to optimise the distance to a rest pose. The rest pose defines the joint angles in a typical neutral pose for the robot. When we try to move the end effector to a new position, the inverse kinematics system will try to keep the joints as similar to this rest pose as possible, while still achieving the desired end effector position and orientation. This helps to prevent the inverse kinematics system from choosing an unexpected pose to solve the system. The solution will be the one which looks most similar to the typical rest pose. We can dynamically decide this rest pose to influence the resulting solution. For example, defining a rest pose which keeps all links of the arm high, to prevent it from knocking over other objects on a table.\\
 
 This is referred to as null space inverse kinematics \cite{null-space}. We have a primary goal, to reach a desired end effector position and orientation. As mentioned the system is underdetermined, so there exist many possible solutions. The secondary goal is then achieved by operating within the null space of the first system. By definition, the null space, or kernel of the primary system is the solution space which gets mapped to the zero vector. This means that we can further refine a solution to the secondary goal, without impacting the primary goal, since all the changes we make necessarily have a result of 0 on the primary goal.
 
 
-\chapter{Evaluation Test Suite}
+\chapter{Evaluation test suite}
 \label{apx:test-suite}
 
 This appendix details specifics about the test suite used in \refchap{chap:evaluation}.\\
@@ -62,25 +92,24 @@ This appendix details specifics about the test suite used in \refchap{chap:evalu
     \label{fig:testImages}
 \end{figure}
 
-
 By analysing these images we can understand why some of the objects are more sensitive to noise, as explored in \refsec{sec:noise-test}.
-%TODO include observations from second test. ie which objects are forgiving, which fail more tests (i bet sphere)
 
 \subsubsection{Lego object}
-In this object the keypoints are marked as the 4 corners. It is very easy to identify these even when the object was rotated. This explains why this object had the lowest systematic error (as discussed in \refsec{sec:noise-test}) because the human error was very close to 0.\
+For this object the keypoints are marked as the 4 corners. It is very easy to identify these even when the object was rotated. This explains why this object had the lowest systematic error (as discussed in \refsec{sec:noise-test}) because the human error was very close to 0.
+
 \subsubsection{Mug object}
-In this object the keypoints are marked at even intervals around the mug, as well as the corners of the handle. However, in the demonstration image, the top of the mug is out of frame. This reduces how many keypoints we can identify. The circular nature of this object makes placing keypoints in the exact correct position more challenging.
+For this object the keypoints are marked at even intervals around the mug, as well as the corners of the handle. However, in the demonstration image, the top of the mug is out of frame. This reduces how many keypoints we can identify. The circular nature of this object makes placing keypoints in the exact correct position more challenging.
 
 \subsubsection{Ball Object}
-This object is surprisingly difficult to mark keypoints given it is a perfect sphere. As such keypoints move in difficult to predict ways for a human keypoint matcher. Furthermore, the pattern of the ball changes quite significantly with the perspective of the camera, even though no rotation was applied.
+This object is surprisingly difficult to mark keypoints given it is a perfect sphere. As such keypoints move in difficult to predict ways for a human keypoint matcher. Furthermore, the pattern of the ball changes quite significantly with the perspective of the camera, even though no rotation was applied. This contributes to the very large rotation error when using this object, as seen in \refsec{sec:algos-test}.
 
 \subsubsection{Jenga block object}
-This object experienced the largest amount of systematic error by a large margin in \refsec{sec:noise-test}. Initially one might think that it should be easy to identify keypoints. Like with the Lego object, we may try to mark the corners of the block. However, in the demonstration image the top of the block is out of frame. This is deliberate to make the test more challenging for the system. As a result we can only mark the bottom two corners as keypoints. Instead we match identifiable points of the text on the object. This allows us to manually identify far more keypoints, the most of any object at 22.
+This object experienced the a large amount of systematic error in \refsec{sec:noise-test}. Initially one might think that it should be easy to identify keypoints. Like with the Lego object, we may try to mark the corners of the block. However, in the demonstration image the top of the block is out of frame. This is deliberate to make the test more challenging for the system. As a result we can only mark the bottom two corners as keypoints. Instead we match identifiable points of the text on the object. This allows us to manually identify far more keypoints, the most of any object at 22.
 
 \subsubsection{Dominoes}
 This \socalled{object} is interesting because it is actually not a single object but multiple. The rotation applied in \reftab{tab:test-suite} is not applied about the centre like other objects. The line is rotated about the first domino. This presents some challenges for the robot since in order to knock over the domino line successfully it needs to rotate the vector it approaches at, unlike most objects where the angle of approach does not matter, provided the end effector is spun to the correct angle.\\
 
-In this test we can only identify a small number of keypoints since the majority of the domino line is out if frame.
+In this test we can only identify a small number of keypoints since the majority of the domino line is out of frame.
 
 
 % \chapter{Additional Evaluation Figures}
