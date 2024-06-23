@@ -2,6 +2,7 @@
 # One Shot Imitation Learning
 
 Final Year Project - Alfie Chenery
+
 Project repo: https://github.com/alfie-chenery/OneShotImitationLearning
 
 I have been the sole contributor to this repo and it has remained private until 23/06/24 where it has been made public for the purposes of allowing yourself and the marking team to view the repo. Once a mark is awarded for the project, or I am informed that access is no longer required by the marking team. I intend to make the repo private again, where it will become a personal project of mine as I look to implement the ideas I discussed in the future work section of the report.
